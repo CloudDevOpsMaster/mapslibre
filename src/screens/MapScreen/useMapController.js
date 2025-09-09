@@ -14,6 +14,10 @@ import { useRef, useState, useCallback, useEffect } from 'react';
  * - Error handling and recovery
  * - Performance optimization with debouncing
  * - State persistence and restoration
+ * - Search and geocoding functionality
+ * - Theme management
+ * - Clustering support
+ * - Batch operations
  * 
  * @param {Object} config - Controller configuration
  * @param {string} [config.provider='mock'] - Map provider
@@ -36,6 +40,7 @@ export function useMapController({
   const debounceTimeoutRef = useRef(null);
   const operationQueueRef = useRef([]);
   const lastKnownLocationRef = useRef(null);
+  const locationWatchIdRef = useRef(null);
   
   // Core state management
   const [mapState, setMapState] = useState({
@@ -176,7 +181,7 @@ export function useMapController({
       // Wait for map to be ready
       await new Promise(resolve => {
         const checkReady = () => {
-          if (mapRef.current?.isReady()) {
+          if (mapRef.current?.isReady && mapRef.current.isReady()) {
             resolve();
           } else {
             setTimeout(checkReady, 100);
@@ -184,6 +189,11 @@ export function useMapController({
         };
         checkReady();
       });
+      
+      // Restore persisted state if enabled
+      if (enablePersistence) {
+        await restoreState();
+      }
       
       setMapState(prev => ({
         ...prev,
@@ -195,7 +205,7 @@ export function useMapController({
     } catch (error) {
       handleError(error, 'initialization');
     }
-  }, [handleError]);
+  }, [handleError, enablePersistence]);
 
   /**
    * Update map center with animation
@@ -261,7 +271,7 @@ export function useMapController({
       });
       
       const markersArray = Array.from(newMarkers.values());
-      await mapRef.current?.setMarkers(markersArray);
+      await mapRef.current?.setMarkers?.(markersArray);
       
       setMarkersState(prev => ({
         ...prev,
@@ -300,7 +310,7 @@ export function useMapController({
       
       if (validMarkers.length > 0) {
         const markersArray = Array.from(newMarkers.values());
-        await mapRef.current?.setMarkers(markersArray);
+        await mapRef.current?.setMarkers?.(markersArray);
         
         setMarkersState(prev => ({
           ...prev,
@@ -324,7 +334,7 @@ export function useMapController({
       
       if (removed) {
         const markersArray = Array.from(newMarkers.values());
-        await mapRef.current?.setMarkers(markersArray);
+        await mapRef.current?.setMarkers?.(markersArray);
         
         setMarkersState(prev => ({
           ...prev,
@@ -358,7 +368,7 @@ export function useMapController({
         newMarkers.set(markerId, updated);
         
         const markersArray = Array.from(newMarkers.values());
-        await mapRef.current?.setMarkers(markersArray);
+        await mapRef.current?.setMarkers?.(markersArray);
         
         setMarkersState(prev => ({
           ...prev,
@@ -378,7 +388,7 @@ export function useMapController({
    */
   const clearMarkers = useCallback(async () => {
     return executeDebounced(async () => {
-      await mapRef.current?.setMarkers([]);
+      await mapRef.current?.setMarkers?.([]);
       
       setMarkersState(prev => ({
         ...prev,
@@ -406,7 +416,7 @@ export function useMapController({
     
     try {
       return await executeDebounced(async () => {
-        const routeId = await mapRef.current?.addRoute(route);
+        const routeId = await mapRef.current?.addRoute?.(route) || `route_${Date.now()}`;
         
         if (routeId) {
           const newRoutes = new Map(routesState.routes);
@@ -440,7 +450,7 @@ export function useMapController({
    */
   const removeRoute = useCallback(async (routeId) => {
     return executeDebounced(async () => {
-      await mapRef.current?.removeRoute(routeId);
+      await mapRef.current?.removeRoute?.(routeId);
       
       const newRoutes = new Map(routesState.routes);
       const removed = newRoutes.delete(routeId);
@@ -455,6 +465,363 @@ export function useMapController({
       return removed;
     });
   }, [executeDebounced, routesState.routes, routesState.activeRoute]);
+
+  // ================= LOCATION TRACKING =================
+
+  /**
+   * Start location tracking
+   */
+  const startLocationTracking = useCallback(async () => {
+    try {
+      if (!navigator.geolocation) {
+        throw new Error('Geolocation not supported');
+      }
+
+      // Check permissions first
+      if (navigator.permissions) {
+        const permission = await navigator.permissions.query({ name: 'geolocation' });
+        setLocationState(prev => ({ 
+          ...prev, 
+          hasPermission: permission.state === 'granted'
+        }));
+      }
+
+      setLocationState(prev => ({ ...prev, isTracking: true }));
+
+      const watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          const location = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+            heading: position.coords.heading,
+            timestamp: Date.now()
+          };
+
+          lastKnownLocationRef.current = location;
+          
+          setLocationState(prev => ({
+            ...prev,
+            userLocation: location,
+            accuracy: position.coords.accuracy,
+            heading: position.coords.heading,
+            hasPermission: true
+          }));
+
+          console.log('[MapController] Location updated:', location);
+        },
+        (error) => {
+          handleError(error, 'location_tracking');
+          setLocationState(prev => ({ 
+            ...prev, 
+            isTracking: false,
+            hasPermission: false
+          }));
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 60000
+        }
+      );
+
+      locationWatchIdRef.current = watchId;
+      return watchId;
+    } catch (error) {
+      handleError(error, 'start_location_tracking');
+      throw error;
+    }
+  }, [handleError]);
+
+  /**
+   * Stop location tracking
+   */
+  const stopLocationTracking = useCallback(() => {
+    if (locationWatchIdRef.current && navigator.geolocation) {
+      navigator.geolocation.clearWatch(locationWatchIdRef.current);
+      locationWatchIdRef.current = null;
+    }
+    
+    setLocationState(prev => ({ ...prev, isTracking: false }));
+    console.log('[MapController] Location tracking stopped');
+  }, []);
+
+  /**
+   * Get current user location (one-time)
+   */
+  const getCurrentLocation = useCallback(async () => {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error('Geolocation not supported'));
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const location = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+            timestamp: Date.now()
+          };
+          
+          lastKnownLocationRef.current = location;
+          
+          setLocationState(prev => ({
+            ...prev,
+            userLocation: location,
+            accuracy: position.coords.accuracy,
+            hasPermission: true
+          }));
+          
+          resolve(location);
+        },
+        (error) => {
+          handleError(error, 'get_current_location');
+          setLocationState(prev => ({ ...prev, hasPermission: false }));
+          reject(error);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000 // 5 minutes
+        }
+      );
+    });
+  }, [handleError]);
+
+  // ================= PERSISTENCE =================
+
+  /**
+   * Save state to localStorage
+   */
+  const saveState = useCallback(() => {
+    if (!enablePersistence) return;
+    
+    try {
+      const stateToSave = {
+        center: mapState.center,
+        zoom: mapState.zoom,
+        theme: mapState.theme,
+        markers: Array.from(markersState.markers.values()),
+        routes: Array.from(routesState.routes.values()),
+        timestamp: Date.now()
+      };
+      
+      localStorage.setItem('mapController_state', JSON.stringify(stateToSave));
+      console.log('[MapController] State saved to localStorage');
+    } catch (error) {
+      console.warn('[MapController] Failed to save state:', error);
+    }
+  }, [enablePersistence, mapState, markersState.markers, routesState.routes]);
+
+  /**
+   * Restore state from localStorage
+   */
+  const restoreState = useCallback(async () => {
+    if (!enablePersistence) return;
+    
+    try {
+      const savedState = localStorage.getItem('mapController_state');
+      if (!savedState) return;
+      
+      const parsed = JSON.parse(savedState);
+      
+      // Check if state is not too old (24 hours)
+      const maxAge = 24 * 60 * 60 * 1000;
+      if (Date.now() - parsed.timestamp > maxAge) {
+        localStorage.removeItem('mapController_state');
+        return;
+      }
+      
+      // Restore map state
+      if (parsed.center) {
+        setMapState(prev => ({
+          ...prev,
+          center: parsed.center,
+          zoom: parsed.zoom || prev.zoom,
+          theme: parsed.theme || prev.theme
+        }));
+      }
+      
+      // Restore markers
+      if (parsed.markers && parsed.markers.length > 0) {
+        const markersMap = new Map();
+        parsed.markers.forEach(marker => {
+          markersMap.set(marker.id, marker);
+        });
+        
+        setMarkersState(prev => ({
+          ...prev,
+          markers: markersMap
+        }));
+      }
+      
+      // Restore routes
+      if (parsed.routes && parsed.routes.length > 0) {
+        const routesMap = new Map();
+        parsed.routes.forEach(route => {
+          routesMap.set(route.id, route);
+        });
+        
+        setRoutesState(prev => ({
+          ...prev,
+          routes: routesMap
+        }));
+      }
+      
+      console.log('[MapController] State restored from localStorage');
+    } catch (error) {
+      console.warn('[MapController] Failed to restore state:', error);
+      localStorage.removeItem('mapController_state');
+    }
+  }, [enablePersistence]);
+
+  // ================= SEARCH AND GEOCODING =================
+
+  /**
+   * Search for places/addresses
+   */
+  const searchPlaces = useCallback(async (query, options = {}) => {
+    return executeDebounced(async () => {
+      if (!mapRef.current?.searchPlaces) {
+        // Fallback to mock search
+        return mockPlaceSearch(query);
+      }
+      
+      const results = await mapRef.current.searchPlaces(query, {
+        limit: options.limit || 10,
+        bounds: options.bounds,
+        types: options.types || ['address', 'poi']
+      });
+      
+      console.log(`[MapController] Found ${results.length} places for: ${query}`);
+      return results;
+    });
+  }, [executeDebounced]);
+
+  /**
+   * Reverse geocoding - get address from coordinates
+   */
+  const reverseGeocode = useCallback(async (latitude, longitude) => {
+    return executeDebounced(async () => {
+      if (!mapRef.current?.reverseGeocode) {
+        // Fallback to mock reverse geocoding
+        return mockReverseGeocode(latitude, longitude);
+      }
+      
+      const result = await mapRef.current.reverseGeocode(latitude, longitude);
+      console.log(`[MapController] Reverse geocoded: ${latitude}, ${longitude}`);
+      return result;
+    });
+  }, [executeDebounced]);
+
+  /**
+   * Mock place search for testing
+   */
+  const mockPlaceSearch = async (query) => {
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    return [
+      {
+        id: 'place_1',
+        name: `${query} - Resultado 1`,
+        address: 'Calle Ejemplo 123, Guadalajara, Jalisco',
+        latitude: 20.6597 + (Math.random() - 0.5) * 0.1,
+        longitude: -103.3496 + (Math.random() - 0.5) * 0.1,
+        type: 'address'
+      },
+      {
+        id: 'place_2',
+        name: `${query} - Resultado 2`,
+        address: 'Avenida Ejemplo 456, Guadalajara, Jalisco',
+        latitude: 20.6597 + (Math.random() - 0.5) * 0.1,
+        longitude: -103.3496 + (Math.random() - 0.5) * 0.1,
+        type: 'poi'
+      }
+    ];
+  };
+
+  /**
+   * Mock reverse geocoding
+   */
+  const mockReverseGeocode = async (latitude, longitude) => {
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    return {
+      address: 'Calle Generada 789, Guadalajara, Jalisco, México',
+      city: 'Guadalajara',
+      state: 'Jalisco',
+      country: 'México',
+      postalCode: '44100',
+      coordinates: { latitude, longitude }
+    };
+  };
+
+  // ================= CLUSTERING =================
+
+  /**
+   * Update marker clustering
+   */
+  const updateClustering = useCallback(async (enable = true, options = {}) => {
+    return executeDebounced(async () => {
+      if (!mapRef.current?.updateClustering) return;
+      
+      await mapRef.current.updateClustering(enable, {
+        radius: options.radius || 50,
+        maxZoom: options.maxZoom || 15,
+        minPoints: options.minPoints || 2,
+        ...options
+      });
+      
+      console.log(`[MapController] Clustering ${enable ? 'enabled' : 'disabled'}`);
+    });
+  }, [executeDebounced]);
+
+  // ================= THEME MANAGEMENT =================
+
+  /**
+   * Change map theme
+   */
+  const setTheme = useCallback(async (theme) => {
+    return executeDebounced(async () => {
+      if (mapRef.current?.setTheme) {
+        await mapRef.current.setTheme(theme);
+      }
+      
+      setMapState(prev => ({ ...prev, theme }));
+      console.log(`[MapController] Theme changed to: ${theme}`);
+    });
+  }, [executeDebounced]);
+
+  // ================= BATCH OPERATIONS =================
+
+  /**
+   * Batch multiple operations for better performance
+   */
+  const batchOperations = useCallback(async (operations) => {
+    setMapState(prev => ({ ...prev, isLoading: true }));
+    
+    try {
+      const results = [];
+      
+      for (const operation of operations) {
+        const result = await operation();
+        results.push(result);
+      }
+      
+      setMapState(prev => ({ ...prev, isLoading: false }));
+      console.log(`[MapController] Completed ${operations.length} batch operations`);
+      
+      return results;
+    } catch (error) {
+      setMapState(prev => ({ ...prev, isLoading: false }));
+      handleError(error, 'batch_operations');
+      throw error;
+    }
+  }, [handleError]);
 
   // ================= EVENT HANDLERS =================
 
@@ -478,8 +845,8 @@ export function useMapController({
       isReady: true,
       isLoading: false,
       error: null,
-      center: data.center || prev.center,
-      zoom: data.zoom || prev.zoom
+      center: data?.center || prev.center,
+      zoom: data?.zoom || prev.zoom
     }));
     
     console.log('[MapController] Map ready');
@@ -567,6 +934,18 @@ export function useMapController({
     performance: performanceState
   }), [mapState, markersState, routesState, locationState, performanceState]);
 
+  // ================= AUTO-SAVE EFFECT =================
+
+  /**
+   * Auto-save state when it changes
+   */
+  useEffect(() => {
+    if (enablePersistence && mapState.isReady) {
+      const timeoutId = setTimeout(saveState, 1000); // Debounce saves
+      return () => clearTimeout(timeoutId);
+    }
+  }, [mapState, markersState.markers, routesState.routes, saveState, enablePersistence]);
+
   // ================= CLEANUP =================
 
   /**
@@ -578,12 +957,16 @@ export function useMapController({
         clearTimeout(debounceTimeoutRef.current);
       }
       
+      if (locationWatchIdRef.current) {
+        stopLocationTracking();
+      }
+      
       // Clear operation queue
       operationQueueRef.current = [];
       
       console.log('[MapController] Cleaned up');
     };
-  }, []);
+  }, [stopLocationTracking]);
 
   // ================= RETURN API =================
 
@@ -618,6 +1001,31 @@ export function useMapController({
     addRoute,
     removeRoute,
     
+    // Location tracking
+    startLocationTracking,
+    stopLocationTracking,
+    getCurrentLocation,
+    userLocation: locationState.userLocation,
+    isTracking: locationState.isTracking,
+    
+    // Persistence
+    saveState,
+    restoreState,
+    
+    // Search and geocoding
+    searchPlaces,
+    reverseGeocode,
+    
+    // Clustering
+    updateClustering,
+    
+    // Theme
+    setTheme,
+    currentTheme: mapState.theme,
+    
+    // Batch operations
+    batchOperations,
+    
     // Event handlers
     handleMapReady,
     handleMarkerClick,
@@ -629,13 +1037,33 @@ export function useMapController({
     getRoutes,
     getState,
     
-    // Utilities
+    // Utilities and computed values
     isReady: mapState.isReady,
     isLoading: mapState.isLoading,
     hasError: !!mapState.error,
     error: mapState.error,
     selectedMarker: markersState.selectedMarker,
     markerCount: markersState.markers.size,
-    routeCount: routesState.routes.size
+    routeCount: routesState.routes.size,
+    hasLocationPermission: locationState.hasPermission,
+    operationsCount: performanceState.operationsCount,
+    averageResponseTime: performanceState.averageResponseTime,
+    errorCount: performanceState.errorCount,
+    
+    // Center and zoom shortcuts
+    center: mapState.center,
+    zoom: mapState.zoom,
+    
+    // Bounds information
+    bounds: markersState.bounds,
+    
+    // Active route info
+    activeRoute: routesState.activeRoute,
+    isCalculatingRoute: routesState.isCalculating,
+    
+    // Location accuracy
+    locationAccuracy: locationState.accuracy,
+    locationHeading: locationState.heading,
+    lastKnownLocation: lastKnownLocationRef.current
   };
 }

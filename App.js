@@ -74,14 +74,20 @@ function MapTrackingScreen({ navigation, route }) {
     try {
       setIsLoading(true);
       
-      // Load today's packages for the delivery person
-      const loadedPackages = await mapController.loadPackages({
-        deliveryPersonId,
-        status: 'pending,in_transit',
-        date: new Date().toISOString().split('T')[0]
-      });
+      // En App.js línea 78
+      if (mapController && typeof mapController.loadPackages === 'function') {
+          const loadedPackages = await mapController.loadPackages({
+            deliveryPersonId,
+            status: 'pending,in_transit',
+            date: new Date().toISOString().split('T')[0]
+          });
 
-      setPackages(loadedPackages || []);
+          setPackages(loadedPackages || []);
+      } else {
+          console.warn('mapController.loadPackages is not available');
+      }
+      // Load today's packages for the delivery person
+      
 
       // Auto-fit map to show all packages
       if (loadedPackages && loadedPackages.length > 0) {
