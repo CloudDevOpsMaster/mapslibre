@@ -1,45 +1,84 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+// components/NotificationSystem.js - Basic notification system
+import React, { useEffect } from 'react';
+import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
 
-const NotificationSystem = ({ message, type = 'info', duration = 3000, onHide }) => {
-  const [fadeAnim] = useState(new Animated.Value(0));
+const { width } = Dimensions.get('window');
+
+const NotificationSystem = ({ message, type = 'info', onHide }) => {
+  const slideAnim = React.useRef(new Animated.Value(-100)).current;
+  const opacityAnim = React.useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (message) {
-      Animated.sequence([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.delay(duration),
-        Animated.timing(fadeAnim, {
+      // Show animation
+      Animated.parallel([
+        Animated.timing(slideAnim, {
           toValue: 0,
           duration: 300,
           useNativeDriver: true,
         }),
-      ]).start(() => {
-        onHide && onHide();
-      });
+        Animated.timing(opacityAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      // Auto hide after 4 seconds
+      const timer = setTimeout(() => {
+        hideNotification();
+      }, 4000);
+
+      return () => clearTimeout(timer);
+    } else {
+      hideNotification();
     }
-  }, [message, fadeAnim, duration, onHide]);
+  }, [message]);
+
+  const hideNotification = () => {
+    Animated.parallel([
+      Animated.timing(slideAnim, {
+        toValue: -100,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      if (onHide) onHide();
+    });
+  };
 
   if (!message) return null;
 
-  const getBackgroundColor = () => {
+  const getNotificationStyle = () => {
     switch (type) {
-      case 'success': return '#4CAF50';
-      case 'error': return '#F44336';
-      case 'warning': return '#FF9800';
-      default: return '#2196F3';
+      case 'success':
+        return { backgroundColor: '#4CAF50', borderLeftColor: '#388E3C' };
+      case 'error':
+        return { backgroundColor: '#F44336', borderLeftColor: '#D32F2F' };
+      case 'warning':
+        return { backgroundColor: '#FF9800', borderLeftColor: '#F57C00' };
+      default:
+        return { backgroundColor: '#2196F3', borderLeftColor: '#1976D2' };
     }
   };
 
   return (
-    <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
-      <View style={[styles.notification, { backgroundColor: getBackgroundColor() }]}>
-        <Text style={styles.text}>{message}</Text>
-      </View>
+    <Animated.View
+      style={[
+        styles.container,
+        getNotificationStyle(),
+        {
+          transform: [{ translateY: slideAnim }],
+          opacity: opacityAnim,
+        },
+      ]}
+    >
+      <Text style={styles.message}>{message}</Text>
     </Animated.View>
   );
 };
@@ -47,24 +86,24 @@ const NotificationSystem = ({ message, type = 'info', duration = 3000, onHide })
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    top: 50,
-    left: 20,
-    right: 20,
-    zIndex: 1000,
-  },
-  notification: {
+    top: 60,
+    left: 16,
+    right: 16,
     padding: 16,
     borderRadius: 8,
+    borderLeftWidth: 4,
+    zIndex: 1000,
+    elevation: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
-    elevation: 5,
   },
-  text: {
-    color: 'white',
+  message: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '500',
     textAlign: 'center',
-    fontWeight: 'bold',
   },
 });
 

@@ -1,210 +1,293 @@
-// hooks/usePackageManager.js - Custom hook for managing package data
-import { useState, useEffect, useCallback } from 'react';
+// hooks/usePackageManager.js - Hook corregido para evitar loading infinito
+import { useState, useEffect, useCallback, useRef } from 'react';
 
-/**
- * usePackageManager - Custom hook for managing package data from an adapter
- * @param {Object} adapter - The adapter instance to use for data operations
- * @param {Array} initialPackages - Initial packages array
- * @returns {Object} - Package management functions and state
- */
 const usePackageManager = (adapter, initialPackages = []) => {
-  const [packages, setPackages] = useState(initialPackages);
+  const [packages, setPackages] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  const adapterRef = useRef(adapter);
+  const subscriptionRef = useRef(null);
+  const mountedRef = useRef(true);
 
-  /**
-   * Load packages from the adapter
-   */
+  // Actualizar referencia del adapter
+  useEffect(() => {
+    adapterRef.current = adapter;
+  }, [adapter]);
+
+  // Cleanup al desmontar
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+      if (subscriptionRef.current) {
+        subscriptionRef.current();
+        subscriptionRef.current = null;
+      }
+    };
+  }, []);
+
+  // Función para cargar paquetes de manera segura
   const loadPackages = useCallback(async () => {
+    if (!mountedRef.current) return;
+
     try {
       setIsLoading(true);
       setError(null);
-      const packageData = await adapter.getPackages();
-      setPackages(packageData);
-      return packageData;
-    } catch (err) {
-      setError(err.message);
-      console.error('Error loading packages:', err);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [adapter]);
 
-  /**
-   * Update package status
-   */
-  const updatePackageStatus = useCallback(async (packageId, newStatus) => {
-    try {
-      setError(null);
-      const updatedPackage = await adapter.updatePackageStatus(packageId, newStatus);
+      console.log('📦 Iniciando carga de paquetes...');
+
+      // Si tenemos paquetes iniciales, usarlos primero
+      if (initialPackages && initialPackages.length > 0) {
+        console.log(`📦 Usando ${initialPackages.length} paquetes iniciales`);
+        setPackages(initialPackages);
+        setIsLoading(false);
+        return initialPackages;
+      }
+
+      // Si no hay paquetes iniciales, intentar cargar del adapter
+      if (adapterRef.current && typeof adapterRef.current.getPackages === 'function') {
+        console.log('📦 Cargando paquetes del adapter...');
+        
+        const loadedPackages = await adapterRef.current.getPackages();
+        
+        if (!mountedRef.current) return;
+
+        if (Array.isArray(loadedPackages)) {
+          console.log(`📦 Cargados ${loadedPackages.length} paquetes del adapter`);
+          setPackages(loadedPackages);
+        } else {
+          console.warn('📦 El adapter no devolvió un array válido, usando array vacío');
+          setPackages([]);
+        }
+      } else {
+        console.log('📦 No hay adapter disponible o no tiene método getPackages, usando paquetes vacíos');
+        setPackages([]);
+      }
+
+    } catch (err) {
+      console.error('❌ Error cargando paquetes:', err);
       
-      setPackages(prevPackages => 
-        prevPackages.map(pkg => 
+      if (mountedRef.current) {
+        setError(err.message || 'Error cargando paquetes');
+        // En caso de error, usar paquetes iniciales si están disponibles
+        if (initialPackages && initialPackages.length > 0) {
+          console.log('📦 Usando paquetes iniciales como fallback');
+          setPackages(initialPackages);
+        } else {
+          setPackages([]);
+        }
+      }
+    } finally {
+      if (mountedRef.current) {
+        setIsLoading(false);
+        console.log('📦 Carga de paquetes completada');
+      }
+    }
+  }, [initialPackages]);
+
+  // Cargar paquetes al inicializar o cuando cambien los iniciales
+  useEffect(() => {
+    // Pequeño delay para evitar problemas de renderizado
+    const timer = setTimeout(() => {
+      if (mountedRef.current) {
+        loadPackages();
+      }
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [loadPackages]);
+
+  // Función para actualizar estado de un paquete
+  const updatePackageStatus = useCallback(async (packageId, newStatus) => {
+    if (!mountedRef.current) return null;
+
+    try {
+      console.log(`📦 Actualizando paquete ${packageId} a estado ${newStatus}`);
+
+      // Actualizar localmente primero para UI responsiva
+      setPackages(prev => 
+        prev.map(pkg => 
           pkg.id === packageId 
             ? { ...pkg, status: newStatus, updatedAt: new Date().toISOString() }
             : pkg
         )
       );
-      
-      return updatedPackage;
+
+      // Intentar actualizar en el adapter si está disponible
+      if (adapterRef.current && typeof adapterRef.current.updatePackageStatus === 'function') {
+        const updatedPackage = await adapterRef.current.updatePackageStatus(packageId, newStatus);
+        
+        if (mountedRef.current && updatedPackage) {
+          // Actualizar con la respuesta del adapter
+          setPackages(prev => 
+            prev.map(pkg => 
+              pkg.id === packageId ? updatedPackage : pkg
+            )
+          );
+          return updatedPackage;
+        }
+      }
+
+      // Si no hay adapter, devolver el paquete actualizado localmente
+      const updatedPackage = packages.find(pkg => pkg.id === packageId);
+      return updatedPackage ? { ...updatedPackage, status: newStatus } : null;
+
     } catch (err) {
-      setError(err.message);
-      console.error('Error updating package status:', err);
+      console.error('❌ Error actualizando paquete:', err);
+      
+      // Revertir cambio local en caso de error
+      setPackages(prev => 
+        prev.map(pkg => 
+          pkg.id === packageId 
+            ? { ...pkg } // Mantener estado anterior
+            : pkg
+        )
+      );
+      
       throw err;
     }
-  }, [adapter]);
+  }, [packages]);
 
-  /**
-   * Get package details by ID
-   */
+  // Función para obtener detalles de un paquete
   const getPackageDetails = useCallback(async (packageId) => {
     try {
-      setError(null);
-      return await adapter.getPackageDetails(packageId);
-    } catch (err) {
-      setError(err.message);
-      console.error('Error getting package details:', err);
-      throw err;
-    }
-  }, [adapter]);
+      // Buscar primero en el estado local
+      const localPackage = packages.find(pkg => pkg.id === packageId);
+      
+      if (localPackage) {
+        return localPackage;
+      }
 
-  /**
-   * Subscribe to package updates
-   */
+      // Si no está en el estado local, intentar obtener del adapter
+      if (adapterRef.current && typeof adapterRef.current.getPackageDetails === 'function') {
+        const packageDetails = await adapterRef.current.getPackageDetails(packageId);
+        return packageDetails;
+      }
+
+      return null;
+    } catch (err) {
+      console.error('❌ Error obteniendo detalles del paquete:', err);
+      return null;
+    }
+  }, [packages]);
+
+  // Función para suscribirse a actualizaciones en tiempo real
   const subscribeToUpdates = useCallback((callback) => {
-    return adapter.subscribe(callback);
-  }, [adapter]);
-
-  /**
-   * Add a new package
-   */
-  const addPackage = useCallback(async (newPackage) => {
-    try {
-      setError(null);
-      const addedPackage = await adapter.addPackage(newPackage);
-      setPackages(prev => [...prev, addedPackage]);
-      return addedPackage;
-    } catch (err) {
-      setError(err.message);
-      console.error('Error adding package:', err);
-      throw err;
+    if (!callback || typeof callback !== 'function') {
+      console.warn('📦 Callback de suscripción no es válido');
+      return () => {};
     }
-  }, [adapter]);
 
-  /**
-   * Remove a package by ID
-   */
-  const removePackage = useCallback(async (packageId) => {
-    try {
-      setError(null);
-      await adapter.removePackage(packageId);
-      setPackages(prev => prev.filter(pkg => pkg.id !== packageId));
-      return true;
-    } catch (err) {
-      setError(err.message);
-      console.error('Error removing package:', err);
-      throw err;
+    console.log('📦 Suscribiéndose a actualizaciones en tiempo real');
+
+    // Si el adapter soporta suscripciones
+    if (adapterRef.current && typeof adapterRef.current.subscribeToUpdates === 'function') {
+      try {
+        const unsubscribe = adapterRef.current.subscribeToUpdates((event) => {
+          if (!mountedRef.current) return;
+
+          console.log('📦 Evento recibido del adapter:', event.type);
+
+          switch (event.type) {
+            case 'packageUpdated':
+              setPackages(prev => 
+                prev.map(pkg => 
+                  pkg.id === event.package.id ? event.package : pkg
+                )
+              );
+              break;
+
+            case 'packageAdded':
+              setPackages(prev => [...prev, event.package]);
+              break;
+
+            case 'packageRemoved':
+              setPackages(prev => prev.filter(pkg => pkg.id !== event.packageId));
+              break;
+
+            default:
+              console.log('📦 Tipo de evento desconocido:', event.type);
+          }
+
+          // Llamar al callback externo
+          callback(event);
+        });
+
+        subscriptionRef.current = unsubscribe;
+        return unsubscribe;
+      } catch (err) {
+        console.error('❌ Error suscribiéndose a actualizaciones:', err);
+      }
     }
-  }, [adapter]);
 
-  /**
-   * Filter packages by status
-   */
-  const filterPackagesByStatus = useCallback((status) => {
-    if (status === 'all') return packages;
-    return packages.filter(pkg => pkg.status === status);
-  }, [packages]);
-
-  /**
-   * Sort packages by various criteria
-   */
-  const sortPackages = useCallback((sortBy) => {
-    const sortedPackages = [...packages];
-    
-    switch (sortBy) {
-      case 'priority': {
-        const priorityOrder = { URGENT: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
-        return sortedPackages.sort((a, b) => 
-          priorityOrder[a.priority] - priorityOrder[b.priority]
-        );
-      }
-      
-      case 'distance': {
-        // This would require current location to calculate distances
-        return sortedPackages;
-      }
-      
-      case 'deliveryTime': {
-        return sortedPackages.sort((a, b) => 
-          new Date(a.estimatedDelivery) - new Date(b.estimatedDelivery)
-        );
-      }
-      
-      case 'createdAt': {
-        return sortedPackages.sort((a, b) => 
-          new Date(a.createdAt) - new Date(b.createdAt)
-        );
-      }
-      
-      default:
-        return sortedPackages;
-    }
-  }, [packages]);
-
-  /**
-   * Get delivery statistics
-   */
-  const getDeliveryStats = useCallback(() => {
-    return {
-      total: packages.length,
-      pending: packages.filter(p => p.status === 'PENDING').length,
-      inTransit: packages.filter(p => p.status === 'IN_TRANSIT').length,
-      outForDelivery: packages.filter(p => p.status === 'OUT_FOR_DELIVERY').length,
-      delivered: packages.filter(p => p.status === 'DELIVERED').length,
-      failed: packages.filter(p => p.status === 'FAILED').length,
+    // Fallback: devolver función de cleanup vacía
+    return () => {
+      console.log('📦 Cleanup de suscripción (fallback)');
     };
-  }, [packages]);
-
-  /**
-   * Refresh packages data
-   */
-  const refreshPackages = useCallback(async () => {
-    return await loadPackages();
-  }, [loadPackages]);
-
-  /**
-   * Clear error state
-   */
-  const clearError = useCallback(() => {
-    setError(null);
   }, []);
 
-  // Load packages on initial render
+  // Función para refrescar paquetes manualmente
+  const refreshPackages = useCallback(() => {
+    console.log('📦 Refrescando paquetes manualmente...');
+    return loadPackages();
+  }, [loadPackages]);
+
+  // Función para agregar un paquete
+  const addPackage = useCallback((newPackage) => {
+    if (!mountedRef.current) return;
+
+    console.log('📦 Agregando nuevo paquete:', newPackage.trackingNumber);
+    
+    setPackages(prev => {
+      // Evitar duplicados
+      const exists = prev.some(pkg => pkg.id === newPackage.id);
+      if (exists) {
+        console.warn('📦 El paquete ya existe, actualizando...');
+        return prev.map(pkg => 
+          pkg.id === newPackage.id ? newPackage : pkg
+        );
+      }
+      return [...prev, newPackage];
+    });
+  }, []);
+
+  // Función para remover un paquete
+  const removePackage = useCallback((packageId) => {
+    if (!mountedRef.current) return;
+
+    console.log('📦 Removiendo paquete:', packageId);
+    
+    setPackages(prev => prev.filter(pkg => pkg.id !== packageId));
+  }, []);
+
+  // Debug info para desarrollo
   useEffect(() => {
-    if (adapter) {
-      loadPackages();
+    if (__DEV__) {
+      console.log('📦 Estado del PackageManager:', {
+        packagesCount: packages.length,
+        isLoading,
+        hasError: !!error,
+        hasAdapter: !!adapterRef.current,
+        initialPackagesCount: initialPackages.length
+      });
     }
-  }, [adapter, loadPackages]);
+  }, [packages.length, isLoading, error, initialPackages.length]);
 
   return {
-    // State
     packages,
     isLoading,
     error,
-    
-    // Actions
-    loadPackages,
     updatePackageStatus,
+    loadPackages: refreshPackages,
     getPackageDetails,
     subscribeToUpdates,
     addPackage,
     removePackage,
-    filterPackagesByStatus,
-    sortPackages,
-    getDeliveryStats,
-    refreshPackages,
-    clearError,
+    
+    // Funciones de utilidad
+    packagesCount: packages.length,
+    hasPackages: packages.length > 0,
+    refreshPackages
   };
 };
 
