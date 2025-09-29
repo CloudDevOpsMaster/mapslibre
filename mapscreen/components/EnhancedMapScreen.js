@@ -30,8 +30,8 @@ try {
     isTracking: false,
     permissionStatus: 'unknown',
     getCurrentLocation: () => Promise.resolve(null),
-    startLocationTracking: () => {},
-    stopLocationTracking: () => {}
+    startLocationTracking: () => { },
+    stopLocationTracking: () => { }
   });
 }
 
@@ -46,7 +46,7 @@ try {
     updatePackageStatus: () => Promise.resolve({}),
     loadPackages: () => Promise.resolve([]),
     getPackageDetails: () => Promise.resolve(null),
-    subscribeToUpdates: () => () => {}
+    subscribeToUpdates: () => () => { }
   });
 }
 
@@ -55,10 +55,10 @@ try {
 } catch (error) {
   console.warn('useMapControls not found, using fallback');
   useMapControls = () => ({
-    updateDriverLocation: () => {},
-    centerOnLocation: () => {},
-    fitToPackages: () => {},
-    loadPackagesOnMap: () => {}
+    updateDriverLocation: () => { },
+    centerOnLocation: () => { },
+    fitToPackages: () => { },
+    loadPackagesOnMap: () => { }
   });
 }
 
@@ -67,7 +67,7 @@ try {
 } catch (error) {
   console.warn('useAnimations not found, using fallback');
   useAnimations = () => ({
-    fadeIn: () => ({ start: () => {} }),
+    fadeIn: () => ({ start: () => { } }),
     getAnimatedValue: () => new Animated.Value(1)
   });
 }
@@ -80,7 +80,7 @@ try {
 } catch (error) {
   console.warn('NotificationService not found, using fallback');
   NotificationService = class {
-    showTemporaryNotification() {}
+    showTemporaryNotification() { }
   };
 }
 
@@ -89,7 +89,7 @@ try {
 } catch (error) {
   console.warn('PackageService not found, using fallback');
   PackageService = class {
-    constructor() {}
+    constructor() { }
   };
 }
 
@@ -226,7 +226,7 @@ const MapScreen = ({
     loadPackages,
     getPackageDetails,
     subscribeToUpdates
-  } = usePackageManager(adapter.current, initialPackages || []); 
+  } = usePackageManager(adapter.current, initialPackages || []);
 
   // Theme handling
   const safeThemes = themes || { light: {}, dark: {} };
@@ -303,7 +303,7 @@ const MapScreen = ({
     try {
       const data = JSON.parse(event.nativeEvent.data);
       console.log('📨 Message from WebView:', data.type);
-      
+
       switch (data.type) {
         case 'mapReady': {
           console.log('🗺️ MapLibre ready');
@@ -341,24 +341,53 @@ const MapScreen = ({
       onLocationUpdate(locationData);
     }
   }, [onLocationUpdate]);
+  // EnhancedMapScreen.js (Alrededor de la línea 345)
+
+  // EnhancedMapScreen.js (Alrededor de la línea 345)
 
   const handleCenterLocation = useCallback(async (locationData = null) => {
     const targetLocation = locationData || currentLocation;
-    
+
     if (targetLocation) {
+      // Caso 1: Se proporciona la ubicación o ya se conoce (currentLocation)
       centerOnLocation(targetLocation);
     } else {
+      // Caso 2: Es necesario obtener la ubicación primero
       try {
         const location = await getCurrentLocation();
         if (location) {
+          // 🆕 INICIO: Lógica para enviar el pin/marcador al mapa
+          const markerId = `user-center-${Date.now()}`;
+          const markerData = {
+            id: markerId,
+            coordinates: {
+              latitude: location.latitude,
+              longitude: location.longitude
+            },
+            accuracy: location.accuracy || 0,
+            timestamp: location.timestamp || new Date().toISOString(),
+            title: "Mi Ubicación Actual",
+            description: `Precisión: ±${Math.round(location.accuracy || 0)}m`,
+            isUserLocation: true
+          };
+
+          // Envía el mensaje al WebView para que dibuje el marcador
+          sendMessageToWebView({
+            type: 'addUserLocationMarker',
+            marker: markerData
+          });
+
+          // Centra el mapa después de solicitar el pin
           centerOnLocation(location);
+          console.log('✅ Ubicación actual obtenida, pin enviado y mapa centrado.');
+          // 🆕 FIN: Lógica para enviar el pin
         }
       } catch (error) {
-        console.error('❌ Error getting location:', error);
+        console.error('❌ Error al obtener la ubicación:', error);
       }
     }
-  }, [currentLocation, centerOnLocation, getCurrentLocation]);
-
+    // IMPORTANTE: Se añade sendMessageToWebView a las dependencias
+  }, [currentLocation, centerOnLocation, getCurrentLocation, sendMessageToWebView]);
   const handleFitToPackages = useCallback(() => {
     if (packages && packages.length > 0) {
       fitToPackages();

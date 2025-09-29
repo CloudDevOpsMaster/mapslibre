@@ -1,8 +1,19 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, StyleSheet, Animated, Dimensions, TouchableOpacity, Text, Vibration, Alert, Platform } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  Animated,
+  Dimensions,
+  TouchableOpacity,
+  Text,
+  Vibration,
+  Alert,
+  Platform,
+} from 'react-native';
 import * as Location from 'expo-location';
 import { LocationService } from './LocationService';
 import { SyncService } from './SyncService';
+import { addDestinationMarkerToMap } from './MapHelpers';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -13,7 +24,7 @@ const ImprovedFloatingButtons = ({
   mapRef,
   onLocationFound,
   onPackagesSynced,
-  theme = 'light'
+  theme = 'light',
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [locationStatus, setLocationStatus] = useState('idle');
@@ -22,6 +33,7 @@ const ImprovedFloatingButtons = ({
   const [isLocating, setIsLocating] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [locationHistory, setLocationHistory] = useState([]);
+  const [syncDetailedInfo, setSyncDetailedInfo] = useState(null);
 
   const [expandAnim] = useState(new Animated.Value(0));
   const [locationPulse] = useState(new Animated.Value(1));
@@ -49,15 +61,15 @@ const ImprovedFloatingButtons = ({
       const pulseAnimation = Animated.loop(
         Animated.sequence([
           Animated.timing(locationPulse, {
-            toValue: 1.08,
-            duration: 2500,
+            toValue: 1.05,
+            duration: 2000,
             useNativeDriver: true,
           }),
           Animated.timing(locationPulse, {
             toValue: 1,
-            duration: 2500,
+            duration: 2000,
             useNativeDriver: true,
-          })
+          }),
         ])
       );
       pulseAnimation.start();
@@ -74,146 +86,210 @@ const ImprovedFloatingButtons = ({
     };
   }, []);
 
-  const sendMessageToWebView = useCallback((message) => {
-    const timestamp = Date.now();
-    const messageId = `msg_${timestamp}_${Math.random().toString(36).substr(2, 5)}`;
-    
-    const logEntry = {
-      id: messageId,
-      type: message.type,
-      timestamp,
-      success: false,
-      error: null,
-      payload: message
-    };
+  const sendMessageToWebView = useCallback(
+    (message) => {
+      const timestamp = Date.now();
+      const messageId = `msg_${timestamp}_${Math.random()
+        .toString(36)
+        .substr(2, 5)}`;
 
-    if (mapRef?.current) {
-      const enrichedMessage = {
-        ...message,
-        timestamp: new Date().toISOString(),
-        source: 'floating_buttons',
-        messageId
+      const logEntry = {
+        id: messageId,
+        type: message.type,
+        timestamp,
+        success: false,
+        error: null,
+        payload: message,
       };
 
-      try {
-        const messageString = JSON.stringify(enrichedMessage);
-        console.log(`Enviando mensaje:`, message.type);
-        
-        if (typeof mapRef.current.postMessage === 'function') {
-          mapRef.current.postMessage(messageString);
-          logEntry.success = true;
-          console.log(`Mensaje enviado exitosamente`);
-        } else {
-          logEntry.error = 'postMessage no es una función';
-          console.error(`mapRef.current.postMessage no es una función`);
+      if (mapRef?.current) {
+        const enrichedMessage = {
+          ...message,
+          timestamp: new Date().toISOString(),
+          source: 'floating_buttons',
+          messageId,
+        };
+
+        try {
+          const messageString = JSON.stringify(enrichedMessage);
+          console.log(`Enviando mensaje:`, message.type);
+
+          if (typeof mapRef.current.postMessage === 'function') {
+            mapRef.current.postMessage(messageString);
+            logEntry.success = true;
+            console.log(`Mensaje enviado exitosamente`);
+          } else {
+            logEntry.error = 'postMessage no es una función';
+            console.error(`mapRef.current.postMessage no es una función`);
+          }
+        } catch (error) {
+          logEntry.error = error.message;
+          console.error(`Error enviando mensaje:`, error);
         }
-        
-      } catch (error) {
-        logEntry.error = error.message;
-        console.error(`Error enviando mensaje:`, error);
+      } else {
+        logEntry.error = 'mapRef no disponible';
+        console.warn(`MapRef no disponible para enviar mensaje`);
       }
-    } else {
-      logEntry.error = 'mapRef no disponible';
-      console.warn(`MapRef no disponible para enviar mensaje`);
-    }
 
-    setMessageLog(prev => [logEntry, ...prev.slice(0, 19)]);
-    messageLogRef.current = [logEntry, ...messageLogRef.current.slice(0, 19)];
+      setMessageLog((prev) => [logEntry, ...prev.slice(0, 19)]);
+      messageLogRef.current = [logEntry, ...messageLogRef.current.slice(0, 19)];
 
-    return logEntry.success;
-  }, [mapRef]);
+      return logEntry.success;
+    },
+    [mapRef]
+  );
 
-  const addLocationMarkerToMap = useCallback((location) => {
-    const markerData = locationService.createLocationMarker(location);
+  const addLocationMarkerToMap = useCallback(
+    (location) => {
+      const markerData = locationService.createLocationMarker(location);
 
-    console.log('Preparando marcador para envío:', {
-      id: markerData.id,
-      coordinates: markerData.coordinates,
-      accuracy: markerData.accuracy,
-      title: markerData.title
-    });
-
-    const messageSent = sendMessageToWebView({
-      type: 'addUserLocationMarker',
-      marker: markerData
-    });
-
-    console.log(`Resultado envío marcador: ${messageSent ? 'ÉXITO' : 'FALLO'}`);
-
-    if (onLocationFound) {
-      console.log('Llamando onLocationFound con datos completos...');
-      
-      const locationFoundData = {
+      console.log('Preparando marcador para envío:', {
         id: markerData.id,
+        coordinates: markerData.coordinates,
+        accuracy: markerData.accuracy,
+        title: markerData.title,
+      });
+
+      const messageSent = sendMessageToWebView({
+        type: 'addUserLocationMarker',
+        marker: {
+          ...markerData,
+          isDestination: true,
+          icon: 'destination',
+          color: '#f59e0b',
+        },
+      });
+
+      console.log(
+        `Resultado envío marcador: ${messageSent ? 'ÉXITO' : 'FALLO'}`
+      );
+
+      if (onLocationFound) {
+        console.log('Llamando onLocationFound con datos completos...');
+
+        const locationFoundData = {
+          id: markerData.id,
+          latitude: location.latitude,
+          longitude: location.longitude,
+          accuracy: location.accuracy,
+          timestamp: location.timestamp,
+          altitude: location.altitude,
+          speed: location.speed,
+          heading: location.heading,
+          title: markerData.title,
+          description: markerData.description,
+          coordinates: {
+            latitude: location.latitude,
+            longitude: location.longitude,
+          },
+          coordinate: {
+            latitude: location.latitude,
+            longitude: location.longitude,
+          },
+          markerData: markerData,
+          method: location.method,
+          totalReadings: location.totalReadings,
+          goodReadings: location.goodReadings,
+          isAveraged: location.isAveraged,
+        };
+
+        try {
+          onLocationFound(locationFoundData);
+          console.log('onLocationFound ejecutado correctamente');
+        } catch (error) {
+          console.error('Error ejecutando onLocationFound:', error);
+        }
+      } else {
+        console.warn('onLocationFound no disponible');
+      }
+
+      setLocationHistory((prev) => [
+        {
+          ...location,
+          markerData,
+          addedAt: new Date().toISOString(),
+          messageSent,
+        },
+        ...prev.slice(0, 9),
+      ]);
+
+      console.log('Marcador procesado:', markerData.title);
+      return markerData;
+    },
+    [sendMessageToWebView, onLocationFound, locationService]
+  );
+
+  const centerMapOnLocation = useCallback(
+    (location) => {
+      const accuracyInfo = locationService.getLocationAccuracyInfo(
+        location.accuracy
+      );
+
+      const messageSent = sendMessageToWebView({
+        type: 'centerOnLocation',
         latitude: location.latitude,
         longitude: location.longitude,
-        accuracy: location.accuracy,
-        timestamp: location.timestamp,
-        altitude: location.altitude,
-        speed: location.speed,
-        heading: location.heading,
-        title: markerData.title,
-        description: markerData.description,
-        coordinates: {
-          latitude: location.latitude,
-          longitude: location.longitude
-        },
-        coordinate: {
-          latitude: location.latitude,
-          longitude: location.longitude
-        },
-        markerData: markerData,
-        method: location.method,
-        totalReadings: location.totalReadings,
-        goodReadings: location.goodReadings,
-        isAveraged: location.isAveraged
-      };
+        zoom: accuracyInfo.zoom,
+        animate: true,
+        duration: 1800,
+        easing: 'ease-out',
+      });
 
-      try {
-        onLocationFound(locationFoundData);
-        console.log('onLocationFound ejecutado correctamente');
-      } catch (error) {
-        console.error('Error ejecutando onLocationFound:', error);
+      if (messageSent) {
+        console.log(
+          `Centrando mapa: ${location.latitude.toFixed(
+            6
+          )}, ${location.longitude.toFixed(6)} (zoom: ${accuracyInfo.zoom})`
+        );
+      } else {
+        console.warn('Falló el centrado del mapa');
       }
-    } else {
-      console.warn('onLocationFound no disponible');
-    }
 
-    setLocationHistory(prev => [
-      {
-        ...location,
-        markerData,
-        addedAt: new Date().toISOString(),
-        messageSent
-      },
-      ...prev.slice(0, 9)
-    ]);
+      return messageSent;
+    },
+    [sendMessageToWebView, locationService]
+  );
 
-    console.log('Marcador procesado:', markerData.title);
-    return markerData;
-  }, [sendMessageToWebView, onLocationFound, locationService]);
+  const centerOnSyncedDestination = useCallback(
+    (destination) => {
+      const coordinates = destination?.coordinates;
 
-  const centerMapOnLocation = useCallback((location) => {
-    const accuracyInfo = locationService.getLocationAccuracyInfo(location.accuracy);
+      if (
+        !coordinates ||
+        typeof coordinates.latitude !== 'number' ||
+        typeof coordinates.longitude !== 'number'
+      ) {
+        console.warn('Coordenadas de destino inválidas.');
+        Alert.alert('Error', 'No hay coordenadas válidas para este destino.');
+        return;
+      }
 
-    const messageSent = sendMessageToWebView({
-      type: 'centerOnLocation',
-      latitude: location.latitude,
-      longitude: location.longitude,
-      zoom: accuracyInfo.zoom,
-      animate: true,
-      duration: 1800,
-      easing: 'ease-out'
-    });
+      console.log(
+        `🎯 Acción destino: ${coordinates.latitude}, ${coordinates.longitude}`
+      );
 
-    if (messageSent) {
-      console.log(`Centrando mapa: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)} (zoom: ${accuracyInfo.zoom})`);
-    } else {
-      console.warn('Falló el centrado del mapa');
-    }
+      if (Platform.OS === 'ios') {
+        Vibration.vibrate(50);
+      } else {
+        Vibration.vibrate(50);
+      }
 
-    return messageSent;
-  }, [sendMessageToWebView, locationService]);
+      sendMessageToWebView({
+        type: 'centerOnLocation',
+        latitude: coordinates.latitude,
+        longitude: coordinates.longitude,
+        zoom: 16,
+        animate: true,
+        duration: 1500,
+        easing: 'ease-out',
+      });
+
+      setTimeout(() => {
+        addDestinationMarkerToMap(mapRef, destination);
+      }, 800);
+    },
+    [sendMessageToWebView, mapRef]
+  );
 
   const syncPackages = useCallback(async () => {
     if (isSyncing) {
@@ -223,6 +299,7 @@ const ImprovedFloatingButtons = ({
 
     setIsSyncing(true);
     setSyncStatus('preparing');
+    setSyncDetailedInfo(null);
 
     if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
 
@@ -255,7 +332,7 @@ const ImprovedFloatingButtons = ({
 
       rotateAnimation.start();
       setSyncStatus('requesting');
-      
+
       const responseData = await syncService.syncPackages(userLocation);
 
       rotateAnimation.stop();
@@ -267,26 +344,91 @@ const ImprovedFloatingButtons = ({
       }
 
       setSyncStatus('processing');
-      
+
       if (responseData.packages && responseData.packages.length > 0) {
-        console.log(`Procesando ${responseData.packages.length} paquetes sincronizados`);
-        
-        const mapMarkers = syncService.createPackageMarkers(responseData.packages);
-        
+        console.log(
+          `Procesando ${responseData.packages.length} paquetes sincronizados`
+        );
+
+        const mapMarkers = syncService.createPackageMarkers(
+          responseData.packages
+        );
+
         if (mapMarkers.length > 0) {
-          console.log(`Enviando ${mapMarkers.length} marcadores de paquetes al mapa`);
-          
+          console.log(
+            `Enviando ${mapMarkers.length} marcadores de paquetes al mapa`
+          );
+
           sendMessageToWebView({
             type: 'addPackageMarkers',
             markers: mapMarkers,
             syncInfo: {
               timestamp: new Date().toISOString(),
               totalPackages: responseData.packages.length,
-              mappedPackages: mapMarkers.length
-            }
+              mappedPackages: mapMarkers.length,
+            },
           });
         }
-        
+
+        let greenNumbers = [];
+        let destinationQueries = [];
+        let destinationCoordinates = [];
+
+        responseData.packages.forEach((pkg) => {
+          if (
+            pkg.stamps_summary?.green_numbers &&
+            Array.isArray(pkg.stamps_summary.green_numbers)
+          ) {
+            pkg.stamps_summary.green_numbers.forEach((greenNum) => {
+              greenNumbers.push({
+                number: greenNum.number,
+                tracking: pkg.tracking_number,
+              });
+            });
+          }
+
+          if (
+            pkg.location_details?.destination?.query &&
+            pkg.location_details.destination.query.trim()
+          ) {
+            const destInfo = {
+              query: pkg.location_details.destination.query,
+              tracking: pkg.tracking_number,
+            };
+
+            if (pkg.location_details.destination.coordinates) {
+              destInfo.coordinates = {
+                latitude: pkg.location_details.destination.coordinates.latitude,
+                longitude:
+                  pkg.location_details.destination.coordinates.longitude,
+              };
+            }
+
+            destinationQueries.push(destInfo);
+          }
+
+          if (pkg.location_details?.destination?.coordinates) {
+            destinationCoordinates.push({
+              tracking: pkg.tracking_number,
+              coordinates: pkg.location_details.destination.coordinates,
+              query:
+                pkg.location_details.destination.query || 'Sin descripción',
+            });
+          }
+        });
+
+        setSyncDetailedInfo({
+          packagesCount: responseData.packages.length,
+          totalPackages: responseData.totalPackages || 0,
+          viablePackages: responseData.packages.filter(
+            (pkg) => pkg.route_summary?.viable
+          ).length,
+          greenNumbers: greenNumbers,
+          destinationQueries: destinationQueries,
+          destinationCoordinates: destinationCoordinates,
+          timestamp: responseData.timestamp || new Date().toISOString(),
+        });
+
         if (onPackagesSynced) {
           try {
             await onPackagesSynced(responseData);
@@ -296,7 +438,7 @@ const ImprovedFloatingButtons = ({
         }
       }
 
-      await new Promise(resolve => setTimeout(resolve, 800));
+      await new Promise((resolve) => setTimeout(resolve, 800));
 
       setSyncStatus('success');
 
@@ -310,7 +452,7 @@ const ImprovedFloatingButtons = ({
           toValue: 1,
           duration: 300,
           useNativeDriver: true,
-        })
+        }),
       ]).start();
 
       if (Platform.OS === 'ios') {
@@ -319,13 +461,11 @@ const ImprovedFloatingButtons = ({
         Vibration.vibrate([200, 100, 200]);
       }
 
-      syncService.showSyncNotification('success', responseData);
-
       statusTimeoutRef.current = setTimeout(() => {
         setSyncStatus('idle');
         setIsSyncing(false);
+        setSyncDetailedInfo(null);
       }, 8000);
-
     } catch (error) {
       console.error('Error sincronizando paquetes:', error);
 
@@ -338,6 +478,7 @@ const ImprovedFloatingButtons = ({
 
       setSyncStatus('error');
       setIsSyncing(false);
+      setSyncDetailedInfo(null);
 
       if (Platform.OS === 'ios') {
         Vibration.vibrate([300, 150, 300, 150, 300]);
@@ -350,7 +491,13 @@ const ImprovedFloatingButtons = ({
         syncPackages();
       });
     }
-  }, [isSyncing, userLocation, onPackagesSynced, sendMessageToWebView, syncService]);
+  }, [
+    isSyncing,
+    userLocation,
+    onPackagesSynced,
+    sendMessageToWebView,
+    syncService,
+  ]);
 
   const handleLocationPress = useCallback(async () => {
     if (isLocating) {
@@ -374,14 +521,16 @@ const ImprovedFloatingButtons = ({
       setLocationStatus('timeout');
       setIsLocating(false);
       console.warn('Timeout de ubicación');
-      locationService.showLocationError(new Error('LOCATION_TIMEOUT')).then((result) => {
-        if (result === 'retry') {
-          setLocationStatus('idle');
-          handleLocationPress();
-        } else {
-          setLocationStatus('idle');
-        }
-      });
+      locationService
+        .showLocationError(new Error('LOCATION_TIMEOUT'))
+        .then((result) => {
+          if (result === 'retry') {
+            setLocationStatus('idle');
+            handleLocationPress();
+          } else {
+            setLocationStatus('idle');
+          }
+        });
     }, 35000);
 
     try {
@@ -424,14 +573,15 @@ const ImprovedFloatingButtons = ({
             toValue: 0,
             duration: 200,
             useNativeDriver: true,
-          })
+          }),
         ])
       );
 
       rotateAnimation.start();
       rippleAnimation.start();
 
-      const location = await locationService.getCurrentLocationWithHighPrecision();
+      const location =
+        await locationService.getCurrentLocationWithHighPrecision();
 
       rotateAnimation.stop();
       rippleAnimation.stop();
@@ -450,19 +600,19 @@ const ImprovedFloatingButtons = ({
         lat: location.latitude.toFixed(6),
         lng: location.longitude.toFixed(6),
         accuracy: `±${Math.round(location.accuracy)}m`,
-        method: location.method
+        method: location.method,
       });
 
       setLocationStatus('adding_marker');
       const markerData = addLocationMarkerToMap(location);
 
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       setLocationStatus('centering');
       const centered = centerMapOnLocation(location);
 
       if (centered) {
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        await new Promise((resolve) => setTimeout(resolve, 1500));
       }
 
       if (on_center_location) {
@@ -487,7 +637,7 @@ const ImprovedFloatingButtons = ({
           toValue: 1,
           duration: 300,
           useNativeDriver: true,
-        })
+        }),
       ]).start();
 
       if (Platform.OS === 'ios') {
@@ -500,7 +650,6 @@ const ImprovedFloatingButtons = ({
         setLocationStatus('idle');
         setIsLocating(false);
       }, 4000);
-
     } catch (error) {
       console.error('Error obteniendo ubicación:', error);
 
@@ -531,13 +680,17 @@ const ImprovedFloatingButtons = ({
       });
     }
   }, [
-    isLocating, sendMessageToWebView, addLocationMarkerToMap,
-    centerMapOnLocation, on_center_location, locationService
+    isLocating,
+    sendMessageToWebView,
+    addLocationMarkerToMap,
+    centerMapOnLocation,
+    on_center_location,
+    locationService,
   ]);
 
   const clearUserMarkers = useCallback(() => {
     const messageSent = sendMessageToWebView({
-      type: 'clearUserMarkers'
+      type: 'clearUserMarkers',
     });
 
     if (messageSent) {
@@ -561,57 +714,68 @@ const ImprovedFloatingButtons = ({
     Animated.spring(expandAnim, {
       toValue,
       useNativeDriver: true,
-      tension: 150,
-      friction: 8,
+      tension: 120,
+      friction: 10,
     }).start();
   }, [isExpanded, expandAnim]);
 
-  const executeAction = useCallback((action, actionName) => {
-    if (Platform.OS === 'ios') {
-      Vibration.vibrate([50]);
-    } else {
-      Vibration.vibrate(50);
-    }
+  const executeAction = useCallback(
+    (action, actionName) => {
+      if (Platform.OS === 'ios') {
+        Vibration.vibrate([50]);
+      } else {
+        Vibration.vibrate(50);
+      }
 
-    if (action) {
-      action();
-    }
+      if (action) {
+        action();
+      }
 
-    toggleMenu();
+      toggleMenu();
 
-    console.log(`${actionName} ejecutado`);
-  }, [toggleMenu]);
+      console.log(`${actionName} ejecutado`);
+    },
+    [toggleMenu]
+  );
 
   const showMessageDiagnostics = useCallback(() => {
     const recentMessages = messageLogRef.current.slice(0, 10);
-    const successCount = recentMessages.filter(m => m.success).length;
-    const errorCount = recentMessages.filter(m => !m.success).length;
-    
+    const successCount = recentMessages.filter((m) => m.success).length;
+    const errorCount = recentMessages.filter((m) => !m.success).length;
+
     const diagnosticInfo = [
       `Mensajes recientes: ${recentMessages.length}`,
       `Exitosos: ${successCount}`,
       `Fallidos: ${errorCount}`,
       `Estado mapRef: ${!!mapRef?.current ? 'OK' : 'FALLO'}`,
-      `postMessage disponible: ${typeof mapRef?.current?.postMessage === 'function' ? 'SÍ' : 'NO'}`
+      `postMessage disponible: ${
+        typeof mapRef?.current?.postMessage === 'function' ? 'Sí' : 'NO'
+      }`,
     ].join('\n');
 
     const recentErrors = recentMessages
-      .filter(m => !m.success)
+      .filter((m) => !m.success)
       .slice(0, 3)
-      .map(m => `• ${m.type}: ${m.error}`)
+      .map((m) => `• ${m.type}: ${m.error}`)
       .join('\n');
 
     const syncDiagnostic = [
       `\nESTADO DE SINCRONIZACIÓN:`,
       `Paquetes sincronizados: ${syncService.syncedPackages.length}`,
       `Total en servidor: ${syncService.syncStats.totalPackages}`,
-      `Última sincronización: ${syncService.syncStats.lastSync ? new Date(syncService.syncStats.lastSync).toLocaleTimeString() : 'Nunca'}`,
-      `Sincronizaciones realizadas: ${syncService.syncStats.syncCount}`
+      `Última sincronización: ${
+        syncService.syncStats.lastSync
+          ? new Date(syncService.syncStats.lastSync).toLocaleTimeString()
+          : 'Nunca'
+      }`,
+      `Sincronizaciones realizadas: ${syncService.syncStats.syncCount}`,
     ].join('\n');
 
     Alert.alert(
       'Diagnóstico Completo',
-      diagnosticInfo + (recentErrors ? `\n\nErrores recientes:\n${recentErrors}` : '') + syncDiagnostic,
+      diagnosticInfo +
+        (recentErrors ? `\n\nErrores recientes:\n${recentErrors}` : '') +
+        syncDiagnostic,
       [{ text: 'OK' }]
     );
   }, [mapRef, syncService]);
@@ -623,69 +787,76 @@ const ImprovedFloatingButtons = ({
     }
   }, [syncService, syncPackages]);
 
+  // Interpolations
   const button1Translate = expandAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, -85]
+    outputRange: [0, -85],
   });
 
   const button2Translate = expandAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, -160]
+    outputRange: [0, -160],
   });
 
   const button3Translate = expandAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, -235]
+    outputRange: [0, -235],
   });
 
   const button4Translate = expandAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, -310]
+    outputRange: [0, -310],
   });
 
   const button5Translate = expandAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, -385]
+    outputRange: [0, -385],
   });
 
   const menuRotate = expandAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['0deg', '45deg']
+    outputRange: ['0deg', '45deg'],
   });
 
   const locationSpin = locationRotate.interpolate({
     inputRange: [0, 1],
-    outputRange: ['0deg', '360deg']
+    outputRange: ['0deg', '360deg'],
   });
 
   const syncSpin = syncRotate.interpolate({
     inputRange: [0, 1],
-    outputRange: ['0deg', '360deg']
+    outputRange: ['0deg', '360deg'],
   });
 
   const rippleScale = zoomRipple.interpolate({
     inputRange: [0, 1],
-    outputRange: [1, 3]
+    outputRange: [1, 2.5],
   });
 
   const rippleOpacity = zoomRipple.interpolate({
-    inputRange: [0, 0.6, 1],
-    outputRange: [0.8, 0.4, 0]
+    inputRange: [0, 0.7, 1],
+    outputRange: [0.6, 0.3, 0],
   });
 
   const getLocationButtonStyle = () => {
     const styles = {
-      checking_permissions: { backgroundColor: '#8b5cf6', shadowColor: '#8b5cf6' },
-      requesting_permissions: { backgroundColor: '#8b5cf6', shadowColor: '#8b5cf6' },
+      checking_permissions: {
+        backgroundColor: '#8b5cf6',
+        shadowColor: '#8b5cf6',
+      },
+      requesting_permissions: {
+        backgroundColor: '#a78bfa',
+        shadowColor: '#a78bfa',
+      },
       checking_services: { backgroundColor: '#f59e0b', shadowColor: '#f59e0b' },
       locating: { backgroundColor: '#06b6d4', shadowColor: '#06b6d4' },
       processing: { backgroundColor: '#8b5cf6', shadowColor: '#8b5cf6' },
-      adding_marker: { backgroundColor: '#06b6d4', shadowColor: '#06b6d4' },
-      centering: { backgroundColor: '#8b5cf6', shadowColor: '#8b5cf6' },
+      adding_marker: { backgroundColor: '#22d3ee', shadowColor: '#22d3ee' },
+      centering: { backgroundColor: '#a78bfa', shadowColor: '#a78bfa' },
       success: { backgroundColor: '#10b981', shadowColor: '#10b981' },
       error: { backgroundColor: '#ef4444', shadowColor: '#ef4444' },
       timeout: { backgroundColor: '#f59e0b', shadowColor: '#f59e0b' },
-      idle: { backgroundColor: '#3b82f6', shadowColor: '#3b82f6' }
+      idle: { backgroundColor: '#3b82f6', shadowColor: '#3b82f6' },
     };
 
     return styles[locationStatus] || styles.idle;
@@ -696,11 +867,11 @@ const ImprovedFloatingButtons = ({
       preparing: { backgroundColor: '#8b5cf6', shadowColor: '#8b5cf6' },
       syncing: { backgroundColor: '#06b6d4', shadowColor: '#06b6d4' },
       requesting: { backgroundColor: '#f59e0b', shadowColor: '#f59e0b' },
-      processing: { backgroundColor: '#8b5cf6', shadowColor: '#8b5cf6' },
+      processing: { backgroundColor: '#a78bfa', shadowColor: '#a78bfa' },
       success: { backgroundColor: '#10b981', shadowColor: '#10b981' },
       error: { backgroundColor: '#ef4444', shadowColor: '#ef4444' },
       timeout: { backgroundColor: '#f59e0b', shadowColor: '#f59e0b' },
-      idle: { backgroundColor: '#8b5cf6', shadowColor: '#8b5cf6' }
+      idle: { backgroundColor: '#8b5cf6', shadowColor: '#8b5cf6' },
     };
 
     return styles[syncStatus] || styles.idle;
@@ -713,12 +884,12 @@ const ImprovedFloatingButtons = ({
       checking_services: '📡',
       locating: '🔄',
       processing: '⚙️',
-      adding_marker: '📌',
+      adding_marker: '📍',
       centering: '🎯',
       success: '✅',
       error: '⚠️',
       timeout: '⏰',
-      idle: '🎯'
+      idle: '🎯',
     };
 
     return icons[locationStatus] || icons.idle;
@@ -733,7 +904,7 @@ const ImprovedFloatingButtons = ({
       success: '✅',
       error: '❌',
       timeout: '⏰',
-      idle: '🔄'
+      idle: '🔄',
     };
 
     return icons[syncStatus] || icons.idle;
@@ -746,11 +917,21 @@ const ImprovedFloatingButtons = ({
         syncing: '🔄 Sincronizando con el servidor...',
         requesting: '📡 Consultando base de datos CartaPorte...',
         processing: '⚙️ Procesando paquetes recibidos...',
-        success: `✅ ¡${syncService.syncStats.updatedPackages || 0} paquetes CartaPorte sincronizados!${syncService.syncStats.greenNumbersTotal ? ` • ${syncService.syncStats.greenNumbersTotal} números verdes` : ''}${syncService.syncStats.packagesWithDestinationQuery ? ` • ${syncService.syncStats.packagesWithDestinationQuery} con queries destino` : ''}`,
+        success: `✅ ¡${
+          syncService.syncStats.updatedPackages || 0
+        } paquetes CartaPorte sincronizados!${
+          syncService.syncStats.greenNumbersTotal
+            ? ` • ${syncService.syncStats.greenNumbersTotal} números verdes`
+            : ''
+        }${
+          syncService.syncStats.packagesWithDestinationQuery
+            ? ` • ${syncService.syncStats.packagesWithDestinationQuery} con queries destino`
+            : ''
+        }`,
         error: '❌ Error durante la sincronización',
-        timeout: '⏰ Tiempo agotado para sincronización'
+        timeout: '⏰ Tiempo agotado para sincronización',
       };
-      
+
       return syncMessages[syncStatus] || null;
     }
 
@@ -760,11 +941,11 @@ const ImprovedFloatingButtons = ({
       checking_services: '📡 Verificando servicios de ubicación...',
       locating: '🔄 Obteniendo ubicación de alta precisión...',
       processing: '⚙️ Procesando datos de ubicación...',
-      adding_marker: '📌 Agregando marcador al mapa...',
+      adding_marker: '📍 Agregando marcador al mapa...',
       centering: '🎯 Centrando vista del mapa...',
       success: '✅ ¡Ubicación encontrada con éxito!',
       error: '❌ Error al obtener ubicación',
-      timeout: '⏰ Tiempo agotado para ubicación'
+      timeout: '⏰ Tiempo agotado para ubicación',
     };
 
     return messages[locationStatus] || null;
@@ -779,11 +960,10 @@ const ImprovedFloatingButtons = ({
             {
               opacity: expandAnim.interpolate({
                 inputRange: [0, 1],
-                outputRange: [0, 0.4]
-              })
-            }
-          ]}
-        >
+                outputRange: [0, 0.3],
+              }),
+            },
+          ]}>
           <TouchableOpacity
             style={styles.backdropTouch}
             onPress={toggleMenu}
@@ -799,93 +979,95 @@ const ImprovedFloatingButtons = ({
             {
               transform: [{ scale: rippleScale }],
               opacity: rippleOpacity,
-              backgroundColor: getLocationButtonStyle().backgroundColor + '30',
-              borderColor: getLocationButtonStyle().backgroundColor + '60'
-            }
+              backgroundColor: getLocationButtonStyle().backgroundColor + '25',
+              borderColor: getLocationButtonStyle().backgroundColor + '50',
+            },
           ]}
         />
       )}
 
       <View style={styles.speedDialContainer}>
-
-        <Animated.View style={[
-          styles.speedDialButton,
-          {
-            transform: [
-              { translateY: button5Translate },
-              { scale: expandAnim }
-            ],
-            opacity: expandAnim,
-            zIndex: 1007
-          }
-        ]}>
+        {/* Button 5 - Stats */}
+        <Animated.View
+          style={[
+            styles.speedDialButton,
+            {
+              transform: [
+                { translateY: button5Translate },
+                { scale: expandAnim },
+              ],
+              opacity: expandAnim,
+              zIndex: 1007,
+            },
+          ]}>
           <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: '#10b981' }]}
+            style={[styles.actionButton, { backgroundColor: '#10b981', shadowColor: '#10b981' }]}
             onPress={() => {
               showSyncStats();
               toggleMenu();
             }}
-            activeOpacity={0.8}
-          >
+            activeOpacity={0.8}>
             <Text style={styles.actionIcon}>📊</Text>
           </TouchableOpacity>
 
-          <Animated.View style={[
-            styles.speedDialLabel,
-            { opacity: expandAnim, right: 70 }
-          ]}>
+          <Animated.View
+            style={[styles.speedDialLabel, { opacity: expandAnim, right: 70 }]}>
             <Text style={styles.labelText}>
               Stats ({syncService.syncedPackages.length})
             </Text>
           </Animated.View>
         </Animated.View>
 
+        {/* Button 4 - Diagnostics (Dev only) */}
         {__DEV__ && (
-          <Animated.View style={[
-            styles.speedDialButton,
-            {
-              transform: [
-                { translateY: button4Translate },
-                { scale: expandAnim }
-              ],
-              opacity: expandAnim,
-              zIndex: 1006
-            }
-          ]}>
+          <Animated.View
+            style={[
+              styles.speedDialButton,
+              {
+                transform: [
+                  { translateY: button4Translate },
+                  { scale: expandAnim },
+                ],
+                opacity: expandAnim,
+                zIndex: 1006,
+              },
+            ]}>
             <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: '#6366f1' }]}
+              style={[styles.actionButton, { backgroundColor: '#6366f1', shadowColor: '#6366f1' }]}
               onPress={() => {
                 showMessageDiagnostics();
                 toggleMenu();
               }}
-              activeOpacity={0.8}
-            >
+              activeOpacity={0.8}>
               <Text style={styles.actionIcon}>🔍</Text>
             </TouchableOpacity>
 
-            <Animated.View style={[
-              styles.speedDialLabel,
-              { opacity: expandAnim, right: 70 }
-            ]}>
+            <Animated.View
+              style={[
+                styles.speedDialLabel,
+                { opacity: expandAnim, right: 70 },
+              ]}>
               <Text style={styles.labelText}>Diagnóstico</Text>
             </Animated.View>
           </Animated.View>
         )}
 
+        {/* Button 3 - Clear markers */}
         {locationHistory.length > 0 && (
-          <Animated.View style={[
-            styles.speedDialButton,
-            {
-              transform: [
-                { translateY: button3Translate },
-                { scale: expandAnim }
-              ],
-              opacity: expandAnim,
-              zIndex: 1005
-            }
-          ]}>
+          <Animated.View
+            style={[
+              styles.speedDialButton,
+              {
+                transform: [
+                  { translateY: button3Translate },
+                  { scale: expandAnim },
+                ],
+                opacity: expandAnim,
+                zIndex: 1005,
+              },
+            ]}>
             <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: '#ef4444' }]}
+              style={[styles.actionButton, { backgroundColor: '#ef4444', shadowColor: '#ef4444' }]}
               onPress={() => {
                 Alert.alert(
                   'Limpiar Marcadores',
@@ -898,111 +1080,121 @@ const ImprovedFloatingButtons = ({
                         clearUserMarkers();
                         toggleMenu();
                       },
-                      style: 'destructive'
-                    }
+                      style: 'destructive',
+                    },
                   ]
                 );
               }}
-              activeOpacity={0.8}
-            >
+              activeOpacity={0.8}>
               <Text style={styles.actionIcon}>🗑️</Text>
             </TouchableOpacity>
 
-            <Animated.View style={[
-              styles.speedDialLabel,
-              { opacity: expandAnim, right: 70 }
-            ]}>
-              <Text style={styles.labelText}>Limpiar ({locationHistory.length})</Text>
+            <Animated.View
+              style={[
+                styles.speedDialLabel,
+                { opacity: expandAnim, right: 70 },
+              ]}>
+              <Text style={styles.labelText}>
+                Limpiar ({locationHistory.length})
+              </Text>
             </Animated.View>
           </Animated.View>
         )}
 
-        <Animated.View style={[
-          styles.speedDialButton,
-          {
-            transform: [
-              { translateY: button2Translate },
-              { scale: expandAnim }
-            ],
-            opacity: expandAnim,
-            zIndex: 1004
-          }
-        ]}>
+        {/* Button 2 - Settings */}
+        <Animated.View
+          style={[
+            styles.speedDialButton,
+            {
+              transform: [
+                { translateY: button2Translate },
+                { scale: expandAnim },
+              ],
+              opacity: expandAnim,
+              zIndex: 1004,
+            },
+          ]}>
           <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: '#f59e0b' }]}
+            style={[styles.actionButton, { backgroundColor: '#f59e0b', shadowColor: '#f59e0b' }]}
             onPress={() => executeAction(on_toggle_settings, 'Configuración')}
-            activeOpacity={0.8}
-          >
+            activeOpacity={0.8}>
             <Text style={styles.actionIcon}>⚙️</Text>
           </TouchableOpacity>
 
-          <Animated.View style={[
-            styles.speedDialLabel,
-            { opacity: expandAnim, right: 70 }
-          ]}>
+          <Animated.View
+            style={[styles.speedDialLabel, { opacity: expandAnim, right: 70 }]}>
             <Text style={styles.labelText}>Configuración</Text>
           </Animated.View>
         </Animated.View>
 
-        <Animated.View style={[
-          styles.speedDialButton,
-          {
-            transform: [
-              { translateY: button1Translate },
-              { scale: expandAnim }
-            ],
-            opacity: expandAnim,
-            zIndex: 1003
-          }
-        ]}>
+        {/* Button 1 - Sync */}
+        <Animated.View
+          style={[
+            styles.speedDialButton,
+            {
+              transform: [
+                { translateY: button1Translate },
+                { scale: expandAnim },
+              ],
+              opacity: expandAnim,
+              zIndex: 1003,
+            },
+          ]}>
           <TouchableOpacity
             style={[
-              styles.actionButton, 
+              styles.actionButton,
               getSyncButtonStyle(),
-              syncStatus === 'success' && { transform: [{ scale: successScale }] }
+              syncStatus === 'success' && {
+                transform: [{ scale: successScale }],
+              },
             ]}
             onPress={() => {
               syncPackages();
               toggleMenu();
             }}
             activeOpacity={0.8}
-            disabled={isSyncing}
-          >
-            <Animated.Text style={[
-              styles.actionIcon,
-              ['syncing', 'requesting', 'processing'].includes(syncStatus) && {
-                transform: [{ rotate: syncSpin }]
-              }
-            ]}>
+            disabled={isSyncing}>
+            <Animated.Text
+              style={[
+                styles.actionIcon,
+                ['syncing', 'requesting', 'processing'].includes(
+                  syncStatus
+                ) && {
+                  transform: [{ rotate: syncSpin }],
+                },
+              ]}>
               {getSyncIcon()}
             </Animated.Text>
           </TouchableOpacity>
 
-          <Animated.View style={[
-            styles.speedDialLabel,
-            { opacity: expandAnim, right: 70 }
-          ]}>
+          <Animated.View
+            style={[styles.speedDialLabel, { opacity: expandAnim, right: 70 }]}>
             <Text style={styles.labelText}>
               {isSyncing ? 'Sincronizando...' : 'Sync CartaPorte'}
             </Text>
           </Animated.View>
         </Animated.View>
 
-        <Animated.View style={[
-          styles.mainButtonContainer,
-          {
-            transform: [{
-              scale: locationStatus === 'success' ? successScale :
-                locationStatus === 'idle' ? locationPulse : 1
-            }],
-            zIndex: 1001
-          }
-        ]}>
+        {/* Main Button - Location */}
+        <Animated.View
+          style={[
+            styles.mainButtonContainer,
+            {
+              transform: [
+                {
+                  scale:
+                    locationStatus === 'success'
+                      ? successScale
+                      : locationStatus === 'idle'
+                      ? locationPulse
+                      : 1,
+                },
+              ],
+              zIndex: 1001,
+            },
+          ]}>
           <TouchableOpacity
-            style={[
-              styles.mainButton,
-              getLocationButtonStyle()
-            ]}
+            style={[styles.mainButton, getLocationButtonStyle()]}
             onPress={handleLocationPress}
             onLongPress={() => {
               Alert.alert(
@@ -1012,151 +1204,236 @@ const ImprovedFloatingButtons = ({
                   { text: 'Cancelar', style: 'cancel' },
                   {
                     text: 'Activar',
-                    onPress: () => console.log('TODO: Implementar tracking continuo')
-                  }
+                    onPress: () =>
+                      console.log('TODO: Implementar tracking continuo'),
+                  },
                 ]
               );
             }}
             activeOpacity={0.8}
-            disabled={isLocating}
-          >
-            <Animated.Text style={[
-              styles.mainIcon,
-              ['locating', 'processing'].includes(locationStatus) && {
-                transform: [{ rotate: locationSpin }]
-              }
-            ]}>
+            disabled={isLocating}>
+            <Animated.Text
+              style={[
+                styles.mainIcon,
+                ['locating', 'processing'].includes(locationStatus) && {
+                  transform: [{ rotate: locationSpin }],
+                },
+              ]}>
               {getLocationIcon()}
             </Animated.Text>
 
-            <View style={[
-              styles.buttonGlow,
-              { backgroundColor: getLocationButtonStyle().backgroundColor + '40' }
-            ]} />
+            <View
+              style={[
+                styles.buttonGlow,
+                {
+                  backgroundColor:
+                    getLocationButtonStyle().backgroundColor + '20',
+                },
+              ]}
+            />
 
             {['locating', 'processing'].includes(locationStatus) && (
-              <Animated.View style={[
-                styles.pulseRing,
-                {
-                  transform: [{ scale: zoomRipple }],
-                  opacity: rippleOpacity,
-                  borderColor: getLocationButtonStyle().backgroundColor
-                }
-              ]} />
+              <Animated.View
+                style={[
+                  styles.pulseRing,
+                  {
+                    transform: [{ scale: zoomRipple }],
+                    opacity: rippleOpacity,
+                    borderColor: getLocationButtonStyle().backgroundColor,
+                  },
+                ]}
+              />
             )}
           </TouchableOpacity>
         </Animated.View>
 
-        <Animated.View style={[
-          styles.menuButtonContainer,
-          {
-            transform: [{ rotate: menuRotate }],
-            zIndex: 1002
-          }
-        ]}>
+        {/* Menu Toggle Button */}
+        <Animated.View
+          style={[
+            styles.menuButtonContainer,
+            {
+              transform: [{ rotate: menuRotate }],
+              zIndex: 1002,
+            },
+          ]}>
           <TouchableOpacity
-            style={[
-              styles.menuButton,
-              isExpanded && styles.menuButtonExpanded
-            ]}
+            style={[styles.menuButton, isExpanded && styles.menuButtonExpanded]}
             onPress={toggleMenu}
-            activeOpacity={0.8}
-          >
+            activeOpacity={0.8}>
             <Text style={styles.menuIcon}>+</Text>
           </TouchableOpacity>
         </Animated.View>
       </View>
 
+      {/* Status Bar */}
       {(locationStatus !== 'idle' || syncStatus !== 'idle') && (
-        <Animated.View style={[
-          styles.statusBar,
-          {
-            backgroundColor: syncStatus !== 'idle' ? 
-              getSyncButtonStyle().backgroundColor : 
-              getLocationButtonStyle().backgroundColor,
-            opacity: (locationStatus !== 'idle' || syncStatus !== 'idle') ? 1 : 0,
-          }
-        ]}>
+        <Animated.View
+          style={[
+            styles.statusBar,
+            {
+              backgroundColor:
+                syncStatus !== 'idle'
+                  ? getSyncButtonStyle().backgroundColor + 'f0'
+                  : getLocationButtonStyle().backgroundColor + 'f0',
+              opacity:
+                locationStatus !== 'idle' || syncStatus !== 'idle' ? 1 : 0,
+            },
+          ]}>
           <Text style={styles.statusText}>{getStatusMessage()}</Text>
 
-          {syncStatus === 'success' && syncService.syncStats.totalPackages > 0 && (
+          {syncStatus === 'success' && syncDetailedInfo && (
             <View style={styles.locationInfo}>
               <Text style={styles.accuracyText}>
-                Total en servidor: {syncService.syncStats.totalPackages} paquetes CartaPorte
+                Paquetes obtenidos: {syncDetailedInfo.packagesCount} de{' '}
+                {syncDetailedInfo.totalPackages}
               </Text>
               <Text style={styles.detailText}>
-                Obtenidos: {syncService.syncStats.updatedPackages} | Viables: {syncService.syncedPackages.filter(pkg => pkg.route_summary?.viable).length}
+                Rutas viables: {syncDetailedInfo.viablePackages}
               </Text>
-              {syncService.syncStats.greenNumbersTotal > 0 && (
-                <Text style={styles.detailText}>
-                  Números verdes detectados: {syncService.syncStats.greenNumbersTotal}
-                </Text>
-              )}
-              {syncService.syncStats.packagesWithDestinationQuery > 0 && (
-                <Text style={styles.detailText}>
-                  Con queries destino: {syncService.syncStats.packagesWithDestinationQuery}
-                </Text>
-              )}
+
+              {syncDetailedInfo.greenNumbers &&
+                syncDetailedInfo.greenNumbers.length > 0 && (
+                  <>
+                    <Text style={styles.methodText}>
+                      Números verdes detectados:{' '}
+                      {syncDetailedInfo.greenNumbers.length}
+                    </Text>
+                    {syncDetailedInfo.greenNumbers
+                      .slice(0, 3)
+                      .map((green, idx) => (
+                        <Text key={idx} style={styles.greenNumberText}>
+                          • {green.number} ({green.tracking})
+                        </Text>
+                      ))}
+                    {syncDetailedInfo.greenNumbers.length > 3 && (
+                      <Text style={styles.greenNumberText}>
+                        • ... y {syncDetailedInfo.greenNumbers.length - 3} más
+                      </Text>
+                    )}
+                  </>
+                )}
+
+              {syncDetailedInfo.destinationQueries &&
+                syncDetailedInfo.destinationQueries.length > 0 && (
+                  <>
+                    <Text style={styles.methodText}>
+                      Queries destino encontrados:{' '}
+                      {syncDetailedInfo.destinationQueries.length}
+                    </Text>
+                    {syncDetailedInfo.destinationQueries
+                      .slice(0, 2)
+                      .map((dest, idx) => (
+                        <View key={idx} style={styles.destinationContainer}>
+                          <View style={styles.destinationTextContainer}>
+                            <Text style={styles.queryText} numberOfLines={2}>
+                              • {dest.query} ({dest.tracking})
+                            </Text>
+                            {dest.coordinates && (
+                              <Text style={styles.coordinatesText}>
+                                📍 {dest.coordinates.latitude.toFixed(6)},{' '}
+                                {dest.coordinates.longitude.toFixed(6)}
+                              </Text>
+                            )}
+                          </View>
+                          {dest.coordinates && (
+                            <TouchableOpacity
+                              style={styles.centerDestinationButton}
+                              onPress={() => centerOnSyncedDestination(dest)}
+                              activeOpacity={0.7}>
+                              <Text style={styles.centerDestinationIcon}>
+                                📍
+                              </Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      ))}
+                    {syncDetailedInfo.destinationQueries.length > 2 && (
+                      <Text style={styles.queryText}>
+                        • ... y {syncDetailedInfo.destinationQueries.length - 2}{' '}
+                        más
+                      </Text>
+                    )}
+                  </>
+                )}
+
               <Text style={styles.precisionText}>
-                {new Date(syncService.syncStats.lastSync).toLocaleTimeString()} - Sincronización CartaPorte completa
+                Última sincronización:{' '}
+                {new Date(syncDetailedInfo.timestamp).toLocaleTimeString()}
               </Text>
             </View>
           )}
 
-          {userLocation && locationStatus === 'success' && syncStatus === 'idle' && (
-            <View style={styles.locationInfo}>
-              <Text style={styles.accuracyText}>
-                Precisión: ±{Math.round(userLocation.accuracy || 0)}m
-                ({locationService.getLocationAccuracyInfo(userLocation.accuracy).description})
-              </Text>
-
-              {userLocation.altitude && (
-                <Text style={styles.detailText}>
-                  Altitud: {Math.round(userLocation.altitude)}m
+          {userLocation &&
+            locationStatus === 'success' &&
+            syncStatus === 'idle' && (
+              <View style={styles.locationInfo}>
+                <Text style={styles.accuracyText}>
+                  Precisión: ±{Math.round(userLocation.accuracy || 0)}m (
+                  {
+                    locationService.getLocationAccuracyInfo(
+                      userLocation.accuracy
+                    ).description
+                  }
+                  )
                 </Text>
-              )}
 
-              {userLocation.isAveraged && (
-                <Text style={styles.methodText}>
-                  Promedio de {userLocation.goodReadings} lecturas de alta precisión
+                {userLocation.altitude && (
+                  <Text style={styles.detailText}>
+                    Altitud: {Math.round(userLocation.altitude)}m
+                  </Text>
+                )}
+
+                {userLocation.isAveraged && (
+                  <Text style={styles.methodText}>
+                    Promedio de {userLocation.goodReadings} lecturas de alta
+                    precisión
+                  </Text>
+                )}
+
+                {!userLocation.isAveraged && userLocation.totalReadings > 1 && (
+                  <Text style={styles.methodText}>
+                    Mejor de {userLocation.totalReadings} lecturas GPS
+                  </Text>
+                )}
+
+                {userLocation.accuracy <=
+                  locationService.ACCURACY_THRESHOLDS?.excellent && (
+                  <Text style={styles.precisionText}>Precisión excelente!</Text>
+                )}
+              </View>
+            )}
+
+          {locationHistory.length > 0 &&
+            locationStatus === 'idle' &&
+            syncStatus === 'idle' && (
+              <TouchableOpacity style={styles.historyButton}>
+                <Text style={styles.historyText}>
+                  {locationHistory.length} ubicaciones guardadas
                 </Text>
-              )}
-
-              {!userLocation.isAveraged && userLocation.totalReadings > 1 && (
-                <Text style={styles.methodText}>
-                  Mejor de {userLocation.totalReadings} lecturas GPS
-                </Text>
-              )}
-
-              {userLocation.accuracy <= locationService.ACCURACY_THRESHOLDS?.excellent && (
-                <Text style={styles.precisionText}>Precisión excelente!</Text>
-              )}
-            </View>
-          )}
-
-          {locationHistory.length > 0 && locationStatus === 'idle' && syncStatus === 'idle' && (
-            <TouchableOpacity style={styles.historyButton}>
-              <Text style={styles.historyText}>
-                {locationHistory.length} ubicaciones guardadas
-              </Text>
-            </TouchableOpacity>
-          )}
+              </TouchableOpacity>
+            )}
         </Animated.View>
       )}
 
+      {/* Debug Panel */}
       {__DEV__ && messageLog.length > 0 && (
         <View style={styles.debugPanel}>
           <Text style={styles.debugTitle}>Log de Mensajes</Text>
           {messageLog.slice(0, 3).map((log, index) => (
-            <Text key={log.id} style={[
-              styles.debugMessage,
-              { color: log.success ? '#10b981' : '#ef4444' }
-            ]}>
-              {log.success ? '✅' : '❌'} {log.type} - {new Date(log.timestamp).toLocaleTimeString()}
+            <Text
+              key={log.id}
+              style={[
+                styles.debugMessage,
+                { color: log.success ? '#10b981' : '#ef4444' },
+              ]}>
+              {log.success ? '✅' : '❌'} {log.type} -{' '}
+              {new Date(log.timestamp).toLocaleTimeString()}
             </Text>
           ))}
-          
-          {(syncStatus !== 'idle' || isSyncing || syncService.syncedPackages.length > 0) && (
+
+          {(syncStatus !== 'idle' ||
+            isSyncing ||
+            syncService.syncedPackages.length > 0) && (
             <View style={styles.debugSyncInfo}>
               <Text style={styles.debugSyncTitle}>Estado CartaPorte Sync:</Text>
               <Text style={[styles.debugMessage, { color: '#06b6d4' }]}>
@@ -1169,7 +1446,10 @@ const ImprovedFloatingButtons = ({
               )}
               {syncService.syncStats.lastSync && (
                 <Text style={[styles.debugMessage, { color: '#f59e0b' }]}>
-                  ⏰ Última sync: {new Date(syncService.syncStats.lastSync).toLocaleTimeString()}
+                  ⏰ Última sync:{' '}
+                  {new Date(
+                    syncService.syncStats.lastSync
+                  ).toLocaleTimeString()}
                 </Text>
               )}
             </View>
@@ -1200,7 +1480,7 @@ const styles = StyleSheet.create({
     width: 70,
     height: 70,
     borderRadius: 35,
-    borderWidth: 3,
+    borderWidth: 2,
     zIndex: 999,
   },
   speedDialContainer: {
@@ -1219,22 +1499,25 @@ const styles = StyleSheet.create({
   },
   speedDialLabel: {
     position: 'absolute',
-    backgroundColor: 'rgba(0,0,0,0.9)',
-    paddingHorizontal: 14,
+    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+    paddingHorizontal: 16,
     paddingVertical: 10,
-    borderRadius: 22,
+    borderRadius: 20,
     elevation: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   labelText: {
-    color: '#fff',
+    color: '#f8fafc',
     fontSize: 14,
     fontWeight: '600',
     textAlign: 'center',
     minWidth: 100,
+    letterSpacing: 0.3,
   },
   actionButton: {
     width: 60,
@@ -1242,12 +1525,12 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 10,
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.3)',
+    elevation: 12,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   actionIcon: {
     fontSize: 24,
@@ -1262,12 +1545,12 @@ const styles = StyleSheet.create({
     borderRadius: 37.5,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 15,
+    elevation: 18,
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.5,
-    shadowRadius: 12,
-    borderWidth: 4,
-    borderColor: 'rgba(255,255,255,0.3)',
+    shadowOpacity: 0.4,
+    shadowRadius: 14,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.25)',
     position: 'relative',
   },
   mainIcon: {
@@ -1283,16 +1566,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#ef4444',
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 10,
+    elevation: 12,
     shadowColor: '#ef4444',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.4,
-    shadowRadius: 6,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.3)',
+    shadowRadius: 8,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   menuButtonExpanded: {
     backgroundColor: '#dc2626',
+    shadowOpacity: 0.5,
   },
   menuIcon: {
     fontSize: 22,
@@ -1311,7 +1595,7 @@ const styles = StyleSheet.create({
     width: 75,
     height: 75,
     borderRadius: 37.5,
-    borderWidth: 3,
+    borderWidth: 2.5,
     backgroundColor: 'transparent',
   },
   statusBar: {
@@ -1320,98 +1604,166 @@ const styles = StyleSheet.create({
     left: 15,
     right: 15,
     paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderRadius: 25,
-    elevation: 12,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
+    paddingVertical: 16,
+    borderRadius: 20,
+    elevation: 16,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
     zIndex: 1005,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   statusText: {
     color: '#fff',
     fontSize: 15,
     fontWeight: '600',
     textAlign: 'center',
-    lineHeight: 18,
+    lineHeight: 20,
+    letterSpacing: 0.2,
   },
   locationInfo: {
-    marginTop: 8,
+    marginTop: 10,
     alignItems: 'center',
+    width: '100%',
   },
   accuracyText: {
     color: 'rgba(255,255,255,0.95)',
     fontSize: 13,
     fontWeight: '500',
     textAlign: 'center',
+    letterSpacing: 0.2,
   },
   detailText: {
     color: 'rgba(255,255,255,0.9)',
     fontSize: 12,
     fontWeight: '400',
-    marginTop: 2,
+    marginTop: 3,
     textAlign: 'center',
   },
   methodText: {
     color: 'rgba(255,255,255,0.85)',
     fontSize: 11,
     fontWeight: '400',
-    marginTop: 3,
+    marginTop: 4,
     textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  greenNumberText: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 11,
+    fontWeight: '400',
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  queryText: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 11,
+    fontWeight: '400',
+    textAlign: 'left',
+    lineHeight: 15,
+  },
+  coordinatesText: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 10,
+    fontWeight: '400',
+    marginTop: 2,
+    textAlign: 'left',
     fontStyle: 'italic',
   },
   precisionText: {
     color: '#fff',
     fontSize: 13,
     fontWeight: '700',
-    marginTop: 3,
+    marginTop: 5,
     textAlign: 'center',
+    letterSpacing: 0.3,
   },
   historyButton: {
-    marginTop: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 15,
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   historyText: {
     color: 'rgba(255,255,255,0.9)',
     fontSize: 11,
     textAlign: 'center',
+    fontWeight: '500',
+  },
+  destinationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginTop: 6,
+    paddingLeft: 10,
+    paddingRight: 4,
+  },
+  destinationTextContainer: {
+    flex: 1,
+    marginRight: 10,
+  },
+  centerDestinationButton: {
+    padding: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  centerDestinationIcon: {
+    fontSize: 16,
   },
   debugPanel: {
     position: 'absolute',
     top: 200,
     left: 10,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    padding: 10,
-    borderRadius: 6,
+    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+    padding: 12,
+    borderRadius: 12,
     zIndex: 1010,
     maxWidth: 300,
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.2)',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
   debugTitle: {
-    color: '#fff',
+    color: '#f8fafc',
     fontSize: 12,
     fontWeight: 'bold',
-    marginBottom: 5,
+    marginBottom: 6,
+    letterSpacing: 0.5,
   },
   debugMessage: {
     fontSize: 10,
-    fontFamily: 'monospace',
-    lineHeight: 12,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    lineHeight: 14,
   },
   debugSyncInfo: {
-    marginTop: 8,
-    paddingTop: 8,
+    marginTop: 10,
+    paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.2)',
+    borderTopColor: 'rgba(148, 163, 184, 0.3)',
   },
   debugSyncTitle: {
-    color: '#06b6d4',
+    color: '#22d3ee',
     fontSize: 11,
     fontWeight: 'bold',
-    marginBottom: 3,
+    marginBottom: 4,
+    letterSpacing: 0.5,
   },
 });
 
