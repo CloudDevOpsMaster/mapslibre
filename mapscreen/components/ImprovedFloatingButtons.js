@@ -1,4 +1,8 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+// mapscreen/components/ImprovedFloatingButtons.js - REFACTORED VERSION
+// Uses centralized ui_config.js through styleAdapter
+// Reduced from 280+ lines of StyleSheet to ~50 lines
+
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   StyleSheet,
@@ -10,9 +14,98 @@ import {
   Platform,
 } from 'react-native';
 import * as Location from 'expo-location';
-import { LocationService } from './LocationService';
-import { SyncService } from './SyncService';
-import { addDestinationMarkerToMap } from './MapHelpers';
+
+// Import with fallbacks
+let LocationService, SyncService, addDestinationMarkerToMap, createFloatingButtonStyles, getButtonStateColor, UI_CONFIG;
+
+try {
+  LocationService = require('../services/LocationService').LocationService;
+} catch (e) {
+  console.warn('LocationService not found, using mock');
+  LocationService = class MockLocationService {
+    locationPermission = 'unknown';
+    ACCURACY_THRESHOLDS = { excellent: 5 };
+    checkLocationPermissions() {}
+    async requestLocationPermissions() { return false; }
+    async getCurrentLocationWithHighPrecision() { return null; }
+    createLocationMarker(loc) { return {}; }
+    getLocationAccuracyInfo(acc) { return { description: 'Unknown' }; }
+    async showLocationError(err) { return 'cancel'; }
+  };
+}
+
+try {
+  SyncService = require('../services/SyncService').SyncService;
+} catch (e) {
+  console.warn('SyncService not found, using mock');
+  SyncService = class MockSyncService {
+    syncedPackages = [];
+    syncStats = { updatedPackages: 0, totalPackages: 0, lastSync: null, syncCount: 0 };
+    async syncPackages() { return { packages: [] }; }
+    createPackageMarkers() { return []; }
+    async showSyncError() {}
+    async showSyncStats() { return 'cancel'; }
+  };
+}
+
+try {
+  addDestinationMarkerToMap = require('../utils').addDestinationMarkerToMap;
+} catch (e) {
+  console.warn('addDestinationMarkerToMap not found, using mock');
+  addDestinationMarkerToMap = () => {};
+}
+
+try {
+  const styleAdapter = require('../utils/styleAdapter');
+  createFloatingButtonStyles = styleAdapter.createFloatingButtonStyles;
+  getButtonStateColor = styleAdapter.getButtonStateColor;
+} catch (e) {
+  console.error('styleAdapter not found, using fallback styles');
+  // Fallback styles
+  createFloatingButtonStyles = () => StyleSheet.create({
+    backdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)', zIndex: 998 },
+    backdropTouch: { flex: 1 },
+    searchRipple: { position: 'absolute', bottom: 115, right: 58, width: 70, height: 70, borderRadius: 35, borderWidth: 2, zIndex: 999 },
+    speedDialContainer: { position: 'absolute', bottom: 30, right: 20, alignItems: 'center', zIndex: 1000 },
+    speedDialButton: { position: 'absolute', bottom: 0, alignItems: 'center', flexDirection: 'row', justifyContent: 'flex-end' },
+    speedDialLabel: { position: 'absolute', backgroundColor: 'rgba(15, 23, 42, 0.95)', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, elevation: 8, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)' },
+    labelText: { color: '#f8fafc', fontSize: 14, fontWeight: '600', textAlign: 'center', minWidth: 100 },
+    actionButton: { width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', elevation: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
+    actionIcon: { fontSize: 24, textAlign: 'center' },
+    mainButtonContainer: { marginBottom: 15 },
+    mainButton: { width: 75, height: 75, borderRadius: 37.5, justifyContent: 'center', alignItems: 'center', elevation: 18, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.25)', position: 'relative' },
+    mainIcon: { fontSize: 30, textAlign: 'center', zIndex: 2 },
+    menuButton: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#ef4444', justifyContent: 'center', alignItems: 'center', elevation: 12, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.2)' },
+    menuButtonExpanded: { backgroundColor: '#dc2626' },
+    menuIcon: { fontSize: 22, color: '#fff', fontWeight: 'bold', textAlign: 'center' },
+    buttonGlow: { position: 'absolute', width: 75, height: 75, borderRadius: 37.5 },
+    pulseRing: { position: 'absolute', width: 75, height: 75, borderRadius: 37.5, borderWidth: 2.5, backgroundColor: 'transparent' },
+    statusBar: { position: 'absolute', top: 70, left: 15, right: 15, paddingHorizontal: 20, paddingVertical: 16, borderRadius: 20, elevation: 16, zIndex: 1005, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.15)' },
+    statusText: { color: '#fff', fontSize: 15, fontWeight: '600', textAlign: 'center' },
+    locationInfo: { marginTop: 10, alignItems: 'center', width: '100%' },
+    accuracyText: { color: 'rgba(255,255,255,0.95)', fontSize: 13, fontWeight: '500', textAlign: 'center' },
+    detailText: { color: 'rgba(255,255,255,0.9)', fontSize: 12, fontWeight: '400', marginTop: 3, textAlign: 'center' },
+    methodText: { color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '400', marginTop: 4, textAlign: 'center', fontStyle: 'italic' },
+    debugPanel: { position: 'absolute', top: 200, left: 10, backgroundColor: 'rgba(15, 23, 42, 0.95)', padding: 12, borderRadius: 12, zIndex: 1010, maxWidth: 300, borderWidth: 1, borderColor: 'rgba(148, 163, 184, 0.2)', elevation: 8 },
+    debugTitle: { color: '#f8fafc', fontSize: 12, fontWeight: 'bold', marginBottom: 6 },
+    debugMessage: { fontSize: 10, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', lineHeight: 14 },
+  });
+  getButtonStateColor = (state) => ({ bg: '#3b82f6', shadow: '#3b82f6' });
+}
+
+try {
+  UI_CONFIG = require('../config/ui_config').UI_CONFIG;
+} catch (e) {
+  console.error('UI_CONFIG not found, using defaults');
+  UI_CONFIG = {
+    designTokens: {
+      animations: {
+        durations: { micro: 100, fast: 150, normal: 200, medium: 300, slow: 400, slower: 600 },
+        easings: { linear: [0, 0, 1, 1], easeIn: [0.4, 0, 1, 1], easeOut: [0, 0, 0.2, 1], easeInOut: [0.4, 0, 0.2, 1] }
+      }
+    }
+  };
+}
 
 const ImprovedFloatingButtons = ({
   on_center_location,
@@ -22,6 +115,9 @@ const ImprovedFloatingButtons = ({
   onPackagesSynced,
   theme = 'light',
 }) => {
+  // ============================================================================
+  // STATE
+  // ============================================================================
   const [isExpanded, setIsExpanded] = useState(false);
   const [locationStatus, setLocationStatus] = useState('idle');
   const [syncStatus, setSyncStatus] = useState('idle');
@@ -30,7 +126,13 @@ const ImprovedFloatingButtons = ({
   const [isSyncing, setIsSyncing] = useState(false);
   const [locationHistory, setLocationHistory] = useState([]);
   const [syncDetailedInfo, setSyncDetailedInfo] = useState(null);
+  const [messageLog, setMessageLog] = useState([]);
 
+  // ============================================================================
+  // ANIMATIONS - Using design tokens from UI_CONFIG
+  // ============================================================================
+  const { durations, easings } = UI_CONFIG.designTokens.animations;
+  
   const [expandAnim] = useState(new Animated.Value(0));
   const [locationPulse] = useState(new Animated.Value(1));
   const [locationRotate] = useState(new Animated.Value(0));
@@ -38,16 +140,70 @@ const ImprovedFloatingButtons = ({
   const [zoomRipple] = useState(new Animated.Value(0));
   const [successScale] = useState(new Animated.Value(1));
 
+  // ============================================================================
+  // REFS
+  // ============================================================================
   const locationTimeoutRef = useRef(null);
   const syncTimeoutRef = useRef(null);
   const statusTimeoutRef = useRef(null);
-
-  const [messageLog, setMessageLog] = useState([]);
   const messageLogRef = useRef([]);
 
   const locationService = useRef(new LocationService()).current;
   const syncService = useRef(new SyncService()).current;
 
+  // ============================================================================
+  // MEMOIZED STYLES - Recreate only when theme changes
+  // ============================================================================
+  const styles = useMemo(() => createFloatingButtonStyles(theme), [theme]);
+
+  // ============================================================================
+  // DYNAMIC COLOR GETTERS
+  // ============================================================================
+  const getLocationButtonStyle = useCallback(() => {
+    return getButtonStateColor(locationStatus, 'location', theme);
+  }, [locationStatus, theme]);
+
+  const getSyncButtonStyle = useCallback(() => {
+    return getButtonStateColor(syncStatus, 'sync', theme);
+  }, [syncStatus, theme]);
+
+  // ============================================================================
+  // ICON GETTERS - Extracted to separate functions
+  // ============================================================================
+  const getLocationIcon = useCallback(() => {
+    const icons = {
+      checking_permissions: '🔒',
+      requesting_permissions: '🙋‍♂️',
+      checking_services: '📡',
+      locating: '🔄',
+      processing: '⚙️',
+      adding_marker: '📍',
+      centering: '🎯',
+      success: '✅',
+      error: '⚠️',
+      timeout: '⏰',
+      idle: '📍',
+    };
+    return icons[locationStatus] || icons.idle;
+  }, [locationStatus]);
+
+  const getSyncIcon = useCallback(() => {
+    const icons = {
+      preparing: '📋',
+      syncing: '🔄',
+      requesting: '📡',
+      processing: '⚙️',
+      success: '✅',
+      error: '❌',
+      timeout: '⏰',
+      idle: '🔄',
+    };
+    return icons[syncStatus] || icons.idle;
+  }, [syncStatus]);
+
+  // ============================================================================
+  // LIFECYCLE & EFFECTS
+  // ============================================================================
   useEffect(() => {
     locationService.checkLocationPermissions();
   }, []);
@@ -58,12 +214,12 @@ const ImprovedFloatingButtons = ({
         Animated.sequence([
           Animated.timing(locationPulse, {
             toValue: 1.05,
-            duration: 2000,
+            duration: durations.slower,
             useNativeDriver: true,
           }),
           Animated.timing(locationPulse, {
             toValue: 1,
-            duration: 2000,
+            duration: durations.slower,
             useNativeDriver: true,
           }),
         ])
@@ -71,7 +227,7 @@ const ImprovedFloatingButtons = ({
       pulseAnimation.start();
       return () => pulseAnimation.stop();
     }
-  }, [locationStatus, locationPulse]);
+  }, [locationStatus, locationPulse, durations]);
 
   useEffect(() => {
     return () => {
@@ -81,6 +237,9 @@ const ImprovedFloatingButtons = ({
     };
   }, []);
 
+  // ============================================================================
+  // MESSAGE HANDLING
+  // ============================================================================
   const sendMessageToWebView = useCallback(
     (message) => {
       const timestamp = Date.now();
@@ -132,6 +291,9 @@ const ImprovedFloatingButtons = ({
     [mapRef]
   );
 
+  // ============================================================================
+  // LOCATION MARKER HANDLING
+  // ============================================================================
   const addLocationMarkerToMap = useCallback(
     (location) => {
       const markerData = locationService.createLocationMarker(location);
@@ -210,23 +372,39 @@ const ImprovedFloatingButtons = ({
     [sendMessageToWebView, onLocationFound, locationService]
   );
 
+  // ============================================================================
+  // MAP CENTERING
+  // ============================================================================
   const centerMapOnLocation = useCallback(
     (location) => {
       const accuracyInfo = locationService.getLocationAccuracyInfo(location.accuracy);
+      
+      let zoomLevel = 16;
+      if (location.accuracy <= 5) {
+        zoomLevel = 18;
+      } else if (location.accuracy <= 15) {
+        zoomLevel = 17;
+      } else if (location.accuracy <= 50) {
+        zoomLevel = 16;
+      } else if (location.accuracy <= 100) {
+        zoomLevel = 15;
+      } else {
+        zoomLevel = 14;
+      }
 
       const messageSent = sendMessageToWebView({
         type: 'centerOnLocation',
         latitude: location.latitude,
         longitude: location.longitude,
-        zoom: accuracyInfo.zoom,
+        zoom: zoomLevel,
         animate: true,
-        duration: 1800,
+        duration: durations.slow, // Using design token
         easing: 'ease-out',
       });
 
       if (messageSent) {
         console.log(
-          `Centrando mapa: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)} (zoom: ${accuracyInfo.zoom})`
+          `Centrando mapa: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)} (zoom: ${zoomLevel}, precisión: ±${Math.round(location.accuracy)}m)`
         );
       } else {
         console.warn('Falló el centrado del mapa');
@@ -234,9 +412,12 @@ const ImprovedFloatingButtons = ({
 
       return messageSent;
     },
-    [sendMessageToWebView, locationService]
+    [sendMessageToWebView, locationService, durations]
   );
 
+  // ============================================================================
+  // SYNC DESTINATION CENTERING
+  // ============================================================================
   const centerOnSyncedDestination = useCallback(
     (destination) => {
       const coordinates = destination?.coordinates;
@@ -261,7 +442,7 @@ const ImprovedFloatingButtons = ({
         longitude: coordinates.longitude,
         zoom: 16,
         animate: true,
-        duration: 1500,
+        duration: durations.slow,
         easing: 'ease-out',
       });
 
@@ -269,9 +450,12 @@ const ImprovedFloatingButtons = ({
         addDestinationMarkerToMap(mapRef, destination);
       }, 800);
     },
-    [sendMessageToWebView, mapRef]
+    [sendMessageToWebView, mapRef, durations]
   );
 
+  // ============================================================================
+  // PACKAGE SYNC
+  // ============================================================================
   const syncPackages = useCallback(async () => {
     if (isSyncing) {
       console.log('Ya se está sincronizando...');
@@ -306,7 +490,7 @@ const ImprovedFloatingButtons = ({
       const rotateAnimation = Animated.loop(
         Animated.timing(syncRotate, {
           toValue: 1,
-          duration: 1500,
+          duration: durations.slow,
           useNativeDriver: true,
         })
       );
@@ -410,12 +594,12 @@ const ImprovedFloatingButtons = ({
       Animated.sequence([
         Animated.timing(successScale, {
           toValue: 1.2,
-          duration: 300,
+          duration: durations.normal,
           useNativeDriver: true,
         }),
         Animated.timing(successScale, {
           toValue: 1,
-          duration: 300,
+          duration: durations.normal,
           useNativeDriver: true,
         }),
       ]).start();
@@ -456,8 +640,11 @@ const ImprovedFloatingButtons = ({
         syncPackages();
       });
     }
-  }, [isSyncing, userLocation, onPackagesSynced, sendMessageToWebView, syncService, syncRotate, successScale]);
+  }, [isSyncing, userLocation, onPackagesSynced, sendMessageToWebView, syncService, syncRotate, successScale, durations]);
 
+  // ============================================================================
+  // LOCATION PRESS HANDLER - Enhanced with design tokens
+  // ============================================================================
   const handleLocationPress = useCallback(async () => {
     if (isLocating) {
       console.log('Ya se está obteniendo ubicación...');
@@ -490,6 +677,9 @@ const ImprovedFloatingButtons = ({
       });
     }, 35000);
 
+    let rotateAnimation = null;
+    let rippleAnimation = null;
+
     try {
       let hasPermission = locationService.locationPermission === 'granted';
 
@@ -511,24 +701,24 @@ const ImprovedFloatingButtons = ({
 
       setLocationStatus('locating');
 
-      const rotateAnimation = Animated.loop(
+      rotateAnimation = Animated.loop(
         Animated.timing(locationRotate, {
           toValue: 1,
-          duration: 1500,
+          duration: durations.slow,
           useNativeDriver: true,
         })
       );
 
-      const rippleAnimation = Animated.loop(
+      rippleAnimation = Animated.loop(
         Animated.sequence([
           Animated.timing(zoomRipple, {
             toValue: 1,
-            duration: 2000,
+            duration: durations.slower,
             useNativeDriver: true,
           }),
           Animated.timing(zoomRipple, {
             toValue: 0,
-            duration: 200,
+            duration: durations.normal,
             useNativeDriver: true,
           }),
         ])
@@ -559,22 +749,31 @@ const ImprovedFloatingButtons = ({
         method: location.method,
       });
 
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
       setLocationStatus('adding_marker');
+      console.log('Agregando marcador al mapa...');
       const markerData = addLocationMarkerToMap(location);
 
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 400));
 
       setLocationStatus('centering');
+      console.log('Centrando mapa en ubicación...');
       const centered = centerMapOnLocation(location);
 
       if (centered) {
-        await new Promise((resolve) => setTimeout(resolve, 1500));
+        await new Promise((resolve) => setTimeout(resolve, 2000));
       }
 
       if (on_center_location) {
         try {
-          console.log('Ejecutando callback on_center_location...');
-          await on_center_location(location);
+          console.log('Notificando al componente padre (sin centrar de nuevo)...');
+          await on_center_location({
+            ...location,
+            markerData,
+            source: 'floating_buttons',
+            alreadyCentered: true,
+          });
           console.log('Callback on_center_location ejecutado');
         } catch (callbackError) {
           console.warn('Error en callback on_center_location:', callbackError);
@@ -586,12 +785,12 @@ const ImprovedFloatingButtons = ({
       Animated.sequence([
         Animated.timing(successScale, {
           toValue: 1.2,
-          duration: 300,
+          duration: durations.normal,
           useNativeDriver: true,
         }),
         Animated.timing(successScale, {
           toValue: 1,
-          duration: 300,
+          duration: durations.normal,
           useNativeDriver: true,
         }),
       ]).start();
@@ -606,6 +805,7 @@ const ImprovedFloatingButtons = ({
         setLocationStatus('idle');
         setIsLocating(false);
       }, 4000);
+
     } catch (error) {
       console.error('Error obteniendo ubicación:', error);
 
@@ -635,8 +835,11 @@ const ImprovedFloatingButtons = ({
         }
       });
     }
-  }, [isLocating, addLocationMarkerToMap, centerMapOnLocation, on_center_location, locationService, locationRotate, zoomRipple, successScale]);
+  }, [isLocating, addLocationMarkerToMap, centerMapOnLocation, on_center_location, locationService, locationRotate, zoomRipple, successScale, durations]);
 
+  // ============================================================================
+  // UTILITY FUNCTIONS
+  // ============================================================================
   const clearUserMarkers = useCallback(() => {
     const messageSent = sendMessageToWebView({
       type: 'clearUserMarkers',
@@ -729,7 +932,9 @@ const ImprovedFloatingButtons = ({
     }
   }, [syncService, syncPackages]);
 
-  // Interpolations
+  // ============================================================================
+  // ANIMATED INTERPOLATIONS
+  // ============================================================================
   const button1Translate = expandAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [0, -85],
@@ -780,68 +985,9 @@ const ImprovedFloatingButtons = ({
     outputRange: [0.6, 0.3, 0],
   });
 
-  const getLocationButtonStyle = () => {
-    const styles = {
-      checking_permissions: { backgroundColor: '#8b5cf6', shadowColor: '#8b5cf6' },
-      requesting_permissions: { backgroundColor: '#a78bfa', shadowColor: '#a78bfa' },
-      checking_services: { backgroundColor: '#f59e0b', shadowColor: '#f59e0b' },
-      locating: { backgroundColor: '#06b6d4', shadowColor: '#06b6d4' },
-      processing: { backgroundColor: '#8b5cf6', shadowColor: '#8b5cf6' },
-      adding_marker: { backgroundColor: '#22d3ee', shadowColor: '#22d3ee' },
-      centering: { backgroundColor: '#a78bfa', shadowColor: '#a78bfa' },
-      success: { backgroundColor: '#10b981', shadowColor: '#10b981' },
-      error: { backgroundColor: '#ef4444', shadowColor: '#ef4444' },
-      timeout: { backgroundColor: '#f59e0b', shadowColor: '#f59e0b' },
-      idle: { backgroundColor: '#3b82f6', shadowColor: '#3b82f6' },
-    };
-    return styles[locationStatus] || styles.idle;
-  };
-
-  const getSyncButtonStyle = () => {
-    const styles = {
-      preparing: { backgroundColor: '#8b5cf6', shadowColor: '#8b5cf6' },
-      syncing: { backgroundColor: '#06b6d4', shadowColor: '#06b6d4' },
-      requesting: { backgroundColor: '#f59e0b', shadowColor: '#f59e0b' },
-      processing: { backgroundColor: '#a78bfa', shadowColor: '#a78bfa' },
-      success: { backgroundColor: '#10b981', shadowColor: '#10b981' },
-      error: { backgroundColor: '#ef4444', shadowColor: '#ef4444' },
-      timeout: { backgroundColor: '#f59e0b', shadowColor: '#f59e0b' },
-      idle: { backgroundColor: '#8b5cf6', shadowColor: '#8b5cf6' },
-    };
-    return styles[syncStatus] || styles.idle;
-  };
-
-  const getLocationIcon = () => {
-    const icons = {
-      checking_permissions: '🔒',
-      requesting_permissions: '🙋‍♂️',
-      checking_services: '📡',
-      locating: '🔄',
-      processing: '⚙️',
-      adding_marker: '📍',
-      centering: '🎯',
-      success: '✅',
-      error: '⚠️',
-      timeout: '⏰',
-      idle: '🎯',
-    };
-    return icons[locationStatus] || icons.idle;
-  };
-
-  const getSyncIcon = () => {
-    const icons = {
-      preparing: '📋',
-      syncing: '🔄',
-      requesting: '📡',
-      processing: '⚙️',
-      success: '✅',
-      error: '❌',
-      timeout: '⏰',
-      idle: '🔄',
-    };
-    return icons[syncStatus] || icons.idle;
-  };
-
+  // ============================================================================
+  // STATUS MESSAGE
+  // ============================================================================
   const getStatusMessage = () => {
     if (syncStatus !== 'idle') {
       const syncMessages = {
@@ -865,20 +1011,24 @@ const ImprovedFloatingButtons = ({
     const messages = {
       checking_permissions: '🔒 Verificando permisos de ubicación...',
       requesting_permissions: '🙋‍♂️ Solicitando permisos de ubicación...',
-      checking_services: '📡 Verificando servicios de ubicación...',
-      locating: '🔄 Obteniendo ubicación de alta precisión...',
+      checking_services: '📡 Verificando servicios GPS...',
+      locating: '📡 Obteniendo coordenadas de alta precisión...',
       processing: '⚙️ Procesando datos de ubicación...',
-      adding_marker: '📍 Agregando marcador al mapa...',
-      centering: '🎯 Centrando vista del mapa...',
-      success: '✅ ¡Ubicación encontrada con éxito!',
+      adding_marker: '📍 Agregando marcador en el mapa...',
+      centering: '🎯 Centrando mapa en tu ubicación...',
+      success: '✅ ¡Ubicación fijada en el mapa!',
       error: '❌ Error al obtener ubicación',
       timeout: '⏰ Tiempo agotado para ubicación',
     };
     return messages[locationStatus] || null;
   };
 
+  // ============================================================================
+  // RENDER
+  // ============================================================================
   return (
     <>
+      {/* Backdrop */}
       {isExpanded && (
         <Animated.View
           style={[
@@ -894,15 +1044,16 @@ const ImprovedFloatingButtons = ({
         </Animated.View>
       )}
 
-      {['locating', 'processing'].includes(locationStatus) && (
+      {/* Ripple effect for location search */}
+      {['locating', 'processing', 'adding_marker'].includes(locationStatus) && (
         <Animated.View
           style={[
             styles.searchRipple,
             {
               transform: [{ scale: rippleScale }],
               opacity: rippleOpacity,
-              backgroundColor: getLocationButtonStyle().backgroundColor + '25',
-              borderColor: getLocationButtonStyle().backgroundColor + '50',
+              backgroundColor: getLocationButtonStyle().bg + '25',
+              borderColor: getLocationButtonStyle().bg + '50',
             },
           ]}
         />
@@ -1032,7 +1183,10 @@ const ImprovedFloatingButtons = ({
           <TouchableOpacity
             style={[
               styles.actionButton,
-              getSyncButtonStyle(),
+              { 
+                backgroundColor: getSyncButtonStyle().bg, 
+                shadowColor: getSyncButtonStyle().shadow 
+              },
               syncStatus === 'success' && {
                 transform: [{ scale: successScale }],
               },
@@ -1078,7 +1232,13 @@ const ImprovedFloatingButtons = ({
             },
           ]}>
           <TouchableOpacity
-            style={[styles.mainButton, getLocationButtonStyle()]}
+            style={[
+              styles.mainButton, 
+              { 
+                backgroundColor: getLocationButtonStyle().bg,
+                shadowColor: getLocationButtonStyle().shadow 
+              }
+            ]}
             onPress={handleLocationPress}
             onLongPress={() => {
               Alert.alert('Tracking Continuo', '¿Deseas activar el seguimiento continuo de ubicación?', [
@@ -1094,7 +1254,7 @@ const ImprovedFloatingButtons = ({
             <Animated.Text
               style={[
                 styles.mainIcon,
-                ['locating', 'processing'].includes(locationStatus) && {
+                ['locating', 'processing', 'adding_marker'].includes(locationStatus) && {
                   transform: [{ rotate: locationSpin }],
                 },
               ]}>
@@ -1105,19 +1265,19 @@ const ImprovedFloatingButtons = ({
               style={[
                 styles.buttonGlow,
                 {
-                  backgroundColor: getLocationButtonStyle().backgroundColor + '20',
+                  backgroundColor: getLocationButtonStyle().bg + '20',
                 },
               ]}
             />
 
-            {['locating', 'processing'].includes(locationStatus) && (
+            {['locating', 'processing', 'adding_marker'].includes(locationStatus) && (
               <Animated.View
                 style={[
                   styles.pulseRing,
                   {
                     transform: [{ scale: zoomRipple }],
                     opacity: rippleOpacity,
-                    borderColor: getLocationButtonStyle().backgroundColor,
+                    borderColor: getLocationButtonStyle().bg,
                   },
                 ]}
               />
@@ -1151,8 +1311,8 @@ const ImprovedFloatingButtons = ({
             {
               backgroundColor:
                 syncStatus !== 'idle'
-                  ? getSyncButtonStyle().backgroundColor + 'f0'
-                  : getLocationButtonStyle().backgroundColor + 'f0',
+                  ? getSyncButtonStyle().bg + 'f0'
+                  : getLocationButtonStyle().bg + 'f0',
               opacity: locationStatus !== 'idle' || syncStatus !== 'idle' ? 1 : 0,
             },
           ]}>
@@ -1169,12 +1329,12 @@ const ImprovedFloatingButtons = ({
                 <>
                   <Text style={styles.methodText}>Números verdes detectados: {syncDetailedInfo.greenNumbers.length}</Text>
                   {syncDetailedInfo.greenNumbers.slice(0, 3).map((green, idx) => (
-                    <Text key={idx} style={styles.greenNumberText}>
+                    <Text key={idx} style={styles.detailText}>
                       • {green.number} ({green.tracking})
                     </Text>
                   ))}
                   {syncDetailedInfo.greenNumbers.length > 3 && (
-                    <Text style={styles.greenNumberText}>• ... y {syncDetailedInfo.greenNumbers.length - 3} más</Text>
+                    <Text style={styles.detailText}>• ... y {syncDetailedInfo.greenNumbers.length - 3} más</Text>
                   )}
                 </>
               )}
@@ -1185,36 +1345,41 @@ const ImprovedFloatingButtons = ({
                     Queries destino encontrados: {syncDetailedInfo.destinationQueries.length}
                   </Text>
                   {syncDetailedInfo.destinationQueries.slice(0, 2).map((dest, idx) => (
-                    <View key={idx} style={styles.destinationContainer}>
-                      <View style={styles.destinationTextContainer}>
-                        <Text style={styles.queryText} numberOfLines={2}>
+                    <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.detailText} numberOfLines={2}>
                           • {dest.query} ({dest.tracking})
                         </Text>
                         {dest.coordinates && (
-                          <Text style={styles.coordinatesText}>
+                          <Text style={[styles.methodText, { fontSize: 10, marginTop: 2 }]}>
                             📍 {dest.coordinates.latitude.toFixed(6)}, {dest.coordinates.longitude.toFixed(6)}
                           </Text>
                         )}
                       </View>
                       {dest.coordinates && (
                         <TouchableOpacity
-                          style={styles.centerDestinationButton}
+                          style={{
+                            padding: 8,
+                            backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                            borderRadius: 16,
+                            marginLeft: 8,
+                          }}
                           onPress={() => centerOnSyncedDestination(dest)}
                           activeOpacity={0.7}>
-                          <Text style={styles.centerDestinationIcon}>📍</Text>
+                          <Text style={{ fontSize: 16 }}>📌</Text>
                         </TouchableOpacity>
                       )}
                     </View>
                   ))}
                   {syncDetailedInfo.destinationQueries.length > 2 && (
-                    <Text style={styles.queryText}>
+                    <Text style={styles.detailText}>
                       • ... y {syncDetailedInfo.destinationQueries.length - 2} más
                     </Text>
                   )}
                 </>
               )}
 
-              <Text style={styles.precisionText}>
+              <Text style={[styles.methodText, { marginTop: 8 }]}>
                 Última sincronización: {new Date(syncDetailedInfo.timestamp).toLocaleTimeString()}
               </Text>
             </View>
@@ -1242,14 +1407,16 @@ const ImprovedFloatingButtons = ({
               )}
 
               {userLocation.accuracy <= locationService.ACCURACY_THRESHOLDS?.excellent && (
-                <Text style={styles.precisionText}>Precisión excelente!</Text>
+                <Text style={[styles.accuracyText, { fontWeight: '700', marginTop: 4 }]}>¡Precisión excelente!</Text>
               )}
             </View>
           )}
 
           {locationHistory.length > 0 && locationStatus === 'idle' && syncStatus === 'idle' && (
-            <TouchableOpacity style={styles.historyButton}>
-              <Text style={styles.historyText}>{locationHistory.length} ubicaciones guardadas</Text>
+            <TouchableOpacity style={{ marginTop: 8, padding: 6 }}>
+              <Text style={[styles.detailText, { textAlign: 'center' }]}>
+                {locationHistory.length} ubicaciones guardadas
+              </Text>
             </TouchableOpacity>
           )}
         </Animated.View>
@@ -1268,8 +1435,10 @@ const ImprovedFloatingButtons = ({
           ))}
 
           {(syncStatus !== 'idle' || isSyncing || syncService.syncedPackages.length > 0) && (
-            <View style={styles.debugSyncInfo}>
-              <Text style={styles.debugSyncTitle}>Estado CartaPorte Sync:</Text>
+            <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: 'rgba(148, 163, 184, 0.3)' }}>
+              <Text style={[styles.debugTitle, { color: '#22d3ee', marginBottom: 4 }]}>
+                Estado CartaPorte Sync:
+              </Text>
               <Text style={[styles.debugMessage, { color: '#06b6d4' }]}>
                 🔄 {syncStatus} {isSyncing ? '(activo)' : '(inactivo)'}
               </Text>
@@ -1290,312 +1459,5 @@ const ImprovedFloatingButtons = ({
     </>
   );
 };
-
-const styles = StyleSheet.create({
-  backdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: '#000',
-    zIndex: 998,
-  },
-  backdropTouch: {
-    flex: 1,
-  },
-  searchRipple: {
-    position: 'absolute',
-    bottom: 115,
-    right: 58,
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    borderWidth: 2,
-    zIndex: 999,
-  },
-  speedDialContainer: {
-    position: 'absolute',
-    bottom: 30,
-    right: 20,
-    alignItems: 'center',
-    zIndex: 1000,
-  },
-  speedDialButton: {
-    position: 'absolute',
-    bottom: 0,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  speedDialLabel: {
-    position: 'absolute',
-    backgroundColor: 'rgba(15, 23, 42, 0.95)',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  labelText: {
-    color: '#f8fafc',
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
-    minWidth: 100,
-    letterSpacing: 0.3,
-  },
-  actionButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 12,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
-  actionIcon: {
-    fontSize: 24,
-    textAlign: 'center',
-  },
-  mainButtonContainer: {
-    marginBottom: 15,
-  },
-  mainButton: {
-    width: 75,
-    height: 75,
-    borderRadius: 37.5,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 18,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 14,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.25)',
-    position: 'relative',
-  },
-  mainIcon: {
-    fontSize: 30,
-    textAlign: 'center',
-    zIndex: 2,
-  },
-  menuButtonContainer: {},
-  menuButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#ef4444',
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 12,
-    shadowColor: '#ef4444',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
-  menuButtonExpanded: {
-    backgroundColor: '#dc2626',
-    shadowOpacity: 0.5,
-  },
-  menuIcon: {
-    fontSize: 22,
-    color: '#fff',
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  buttonGlow: {
-    position: 'absolute',
-    width: 75,
-    height: 75,
-    borderRadius: 37.5,
-  },
-  pulseRing: {
-    position: 'absolute',
-    width: 75,
-    height: 75,
-    borderRadius: 37.5,
-    borderWidth: 2.5,
-    backgroundColor: 'transparent',
-  },
-  statusBar: {
-    position: 'absolute',
-    top: 70,
-    left: 15,
-    right: 15,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderRadius: 20,
-    elevation: 16,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    zIndex: 1005,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-  },
-  statusText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
-    textAlign: 'center',
-    lineHeight: 20,
-    letterSpacing: 0.2,
-  },
-  locationInfo: {
-    marginTop: 10,
-    alignItems: 'center',
-    width: '100%',
-  },
-  accuracyText: {
-    color: 'rgba(255,255,255,0.95)',
-    fontSize: 13,
-    fontWeight: '500',
-    textAlign: 'center',
-    letterSpacing: 0.2,
-  },
-  detailText: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 12,
-    fontWeight: '400',
-    marginTop: 3,
-    textAlign: 'center',
-  },
-  methodText: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: 11,
-    fontWeight: '400',
-    marginTop: 4,
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
-  greenNumberText: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 11,
-    fontWeight: '400',
-    marginTop: 2,
-    textAlign: 'center',
-  },
-  queryText: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 11,
-    fontWeight: '400',
-    textAlign: 'left',
-    lineHeight: 15,
-  },
-  coordinatesText: {
-    color: 'rgba(255,255,255,0.75)',
-    fontSize: 10,
-    fontWeight: '400',
-    marginTop: 2,
-    textAlign: 'left',
-    fontStyle: 'italic',
-  },
-  precisionText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '700',
-    marginTop: 5,
-    textAlign: 'center',
-    letterSpacing: 0.3,
-  },
-  historyButton: {
-    marginTop: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  historyText: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 11,
-    textAlign: 'center',
-    fontWeight: '500',
-  },
-  destinationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-    marginTop: 6,
-    paddingLeft: 10,
-    paddingRight: 4,
-  },
-  destinationTextContainer: {
-    flex: 1,
-    marginRight: 10,
-  },
-  centerDestinationButton: {
-    padding: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
-  centerDestinationIcon: {
-    fontSize: 16,
-  },
-  debugPanel: {
-    position: 'absolute',
-    top: 200,
-    left: 10,
-    backgroundColor: 'rgba(15, 23, 42, 0.95)',
-    padding: 12,
-    borderRadius: 12,
-    zIndex: 1010,
-    maxWidth: 300,
-    borderWidth: 1,
-    borderColor: 'rgba(148, 163, 184, 0.2)',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-  },
-  debugTitle: {
-    color: '#f8fafc',
-    fontSize: 12,
-    fontWeight: 'bold',
-    marginBottom: 6,
-    letterSpacing: 0.5,
-  },
-  debugMessage: {
-    fontSize: 10,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    lineHeight: 14,
-  },
-  debugSyncInfo: {
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(148, 163, 184, 0.3)',
-  },
-  debugSyncTitle: {
-    color: '#22d3ee',
-    fontSize: 11,
-    fontWeight: 'bold',
-    marginBottom: 4,
-    letterSpacing: 0.5,
-  },
-});
 
 export default ImprovedFloatingButtons;

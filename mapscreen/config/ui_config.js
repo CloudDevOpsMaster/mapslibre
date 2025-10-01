@@ -1,374 +1,384 @@
-// config/ui_config.js - Advanced UI/UX Design System with Modern Enhancements
+// config/ui_config.js - Modern UI/UX Design System v2.0
 
-// Enhanced Design Tokens with Golden Ratio and Modular Scale
+// ============================================================================
+// DESIGN TOKENS - Base del sistema de diseño
+// ============================================================================
+
 export const DESIGN_TOKENS = {
-  // Spatial System - Based on 8pt grid with Golden Ratio progression
+  // Sistema de espaciado - Grid de 8pt con progresión refinada
   spacing: {
-    xs: 4,      // 0.25rem
-    sm: 8,      // 0.5rem  
-    md: 12,     // 0.75rem
-    lg: 16,     // 1rem
-    xl: 24,     // 1.5rem (golden ratio)
-    xxl: 32,    // 2rem
-    xxxl: 48,   // 3rem
-    mega: 64,   // 4rem
-    ultra: 96,  // 6rem
-    super: 128, // 8rem
-    extreme: 192 // 12rem
+    xs: 4,      // 0.25rem - Padding mínimo
+    sm: 8,      // 0.5rem  - Spacing interno pequeño
+    md: 12,     // 0.75rem - Spacing interno medio
+    lg: 16,     // 1rem    - Spacing estándar
+    xl: 24,     // 1.5rem  - Spacing entre secciones
+    xxl: 32,    // 2rem    - Spacing grande
+    xxxl: 48,   // 3rem    - Spacing muy grande
+    mega: 64,   // 4rem    - Headers, heros
+    ultra: 96,  // 6rem    - Secciones principales
   },
 
-  // Typography System - Fluid scale with improved readability
+  // Sistema tipográfico - Escala modular refinada
   typography: {
     fontFamilies: {
       system: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", "SF Pro Display", sans-serif',
-      mono: 'SF Mono, Monaco, Inconsolata, "Roboto Mono", "Source Code Pro", monospace',
+      mono: 'SF Mono, Monaco, "Roboto Mono", "Source Code Pro", monospace',
       serif: '"New York", "Times New Roman", Georgia, serif'
     },
     
     weights: {
-      thin: '100',
-      extraLight: '200', 
       light: '300',
       regular: '400',
       medium: '500',
       semibold: '600',
       bold: '700',
-      extraBold: '800',
-      black: '900'
+      extrabold: '800',
     },
     
-    // Fluid typography scale - responsive to screen size
+    // Escala tipográfica moderna
     sizes: {
-      xs: { mobile: 10, tablet: 11, desktop: 12 },
-      sm: { mobile: 12, tablet: 13, desktop: 14 },
-      base: { mobile: 14, tablet: 15, desktop: 16 },
-      md: { mobile: 16, tablet: 17, desktop: 18 },
-      lg: { mobile: 18, tablet: 20, desktop: 22 },
-      xl: { mobile: 20, tablet: 24, desktop: 28 },
-      '2xl': { mobile: 24, tablet: 30, desktop: 36 },
-      '3xl': { mobile: 30, tablet: 36, desktop: 48 },
-      '4xl': { mobile: 36, tablet: 48, desktop: 64 }
+      xs: 12,     // Captions, labels pequeños
+      sm: 14,     // Body pequeño, secondary text
+      base: 16,   // Body principal
+      md: 18,     // Body destacado
+      lg: 20,     // Subtítulos
+      xl: 24,     // Títulos de sección
+      '2xl': 28,  // Títulos principales
+      '3xl': 32,  // Headers
+      '4xl': 40,  // Hero text
     },
     
     lineHeights: {
-      none: 1,
-      tight: 1.25,
-      snug: 1.375,
-      normal: 1.5,
-      relaxed: 1.625,
-      loose: 2
+      tight: 1.25,    // Headlines
+      snug: 1.375,    // Subheaders
+      normal: 1.5,    // Body text
+      relaxed: 1.625, // Long-form content
+      loose: 2,       // Espaciado amplio
     },
     
     letterSpacing: {
-      tighter: '-0.05em',
-      tight: '-0.025em', 
-      normal: '0',
-      wide: '0.025em',
-      wider: '0.05em',
-      widest: '0.1em'
+      tighter: -0.5,   // Headlines grandes
+      tight: -0.3,     // Headlines
+      normal: 0,       // Body
+      wide: 0.3,       // Captions
+      wider: 0.5,      // Labels uppercase
     }
   },
 
-  // Advanced Border Radius System
+  // Sistema de Border Radius - Más moderno y consistente
   borderRadius: {
     none: 0,
-    xs: 2,
-    sm: 4,
-    md: 6,
-    lg: 8,
-    xl: 12,
-    '2xl': 16,
-    '3xl': 24,
-    full: 9999,
+    xs: 4,      // Elementos muy pequeños
+    sm: 8,      // Inputs, pequeños botones
+    md: 12,     // Botones estándar
+    lg: 16,     // Cards, containers
+    xl: 20,     // Cards destacadas
+    '2xl': 24,  // Modals, sheets
+    '3xl': 28,  // FABs, elementos destacados
+    full: 9999, // Circular
     
-    // Contextual radii
-    input: 8,
+    // Contextuales
+    input: 10,
     button: 12,
     card: 16,
     modal: 20,
-    sheet: 28,
     fab: 28,
-    pill: 50
   },
 
-  // Sophisticated Elevation System - Multi-layer shadows
+  // Sistema de Elevación - Sombras más sutiles y modernas
   elevation: {
     none: {
       shadowColor: 'transparent',
       shadowOffset: { width: 0, height: 0 },
       shadowOpacity: 0,
       shadowRadius: 0,
-      elevation: 0
+      elevation: 0,
     },
     
-    // Subtle elevations
+    // Elevaciones sutiles
     xs: {
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.05,
-      shadowRadius: 1,
-      elevation: 1
+      shadowOpacity: 0.04,
+      shadowRadius: 2,
+      elevation: 1,
     },
     sm: {
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.06,
-      shadowRadius: 3,
-      elevation: 2
+      shadowRadius: 4,
+      elevation: 2,
     },
     
-    // Standard elevations
+    // Elevaciones estándar
     md: {
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.08,
-      shadowRadius: 6,
-      elevation: 4
+      shadowRadius: 8,
+      elevation: 4,
     },
     lg: {
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: 0.12,
-      shadowRadius: 12,
-      elevation: 8
+      shadowOpacity: 0.10,
+      shadowRadius: 16,
+      elevation: 6,
     },
     xl: {
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 12 },
-      shadowOpacity: 0.15,
-      shadowRadius: 20,
-      elevation: 12
+      shadowOpacity: 0.12,
+      shadowRadius: 24,
+      elevation: 8,
     },
     
-    // Special elevations
+    // Elevaciones especiales
     fab: {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 6 },
-      shadowOpacity: 0.25,
-      shadowRadius: 12,
-      elevation: 16
+      shadowColor: '#4F46E5',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.24,
+      shadowRadius: 16,
+      elevation: 12,
     },
     modal: {
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 20 },
-      shadowOpacity: 0.25,
+      shadowOpacity: 0.20,
       shadowRadius: 40,
-      elevation: 24
-    }
+      elevation: 20,
+    },
   },
 
-  // Advanced Animation System
+  // Sistema de Animación - Transiciones fluidas y modernas
   animations: {
     durations: {
       instant: 0,
-      micro: 75,
-      fast: 150,
-      normal: 200,
-      medium: 300,
-      slow: 400,
-      slower: 600,
-      glacial: 1000
+      micro: 100,    // Micro-interacciones
+      fast: 150,     // Hover, tap feedback
+      normal: 200,   // Transiciones estándar
+      medium: 300,   // Modals, sheets
+      slow: 400,     // Navegación
+      slower: 600,   // Transiciones complejas
     },
     
-    // Refined easing curves
+    // Curvas de easing modernas
     easings: {
+      // Estándar
       linear: [0.0, 0.0, 1.0, 1.0],
       easeIn: [0.4, 0.0, 1.0, 1.0],
       easeOut: [0.0, 0.0, 0.2, 1.0],
       easeInOut: [0.4, 0.0, 0.2, 1.0],
       
-      // Apple-inspired curves
-      easeInQuint: [0.64, 0, 0.78, 0],
-      easeOutQuint: [0.22, 1, 0.36, 1],
-      easeInOutQuint: [0.83, 0, 0.17, 1],
-      
-      // Custom branded curves
-      brand: [0.25, 0.46, 0.45, 0.94],
+      // Modernas (Apple-inspired)
+      smooth: [0.25, 0.1, 0.25, 1.0],
+      snappy: [0.4, 0.0, 0.2, 1.0],
+      gentle: [0.25, 0.46, 0.45, 0.94],
       bounce: [0.68, -0.55, 0.265, 1.55],
-      backOut: [0.34, 1.56, 0.64, 1],
-      anticipate: [0.25, 0.46, 0.45, 0.94]
     },
     
-    spring: {
-      gentle: { tension: 120, friction: 14, mass: 1 },
-      wobbly: { tension: 180, friction: 12, mass: 1 },
-      stiff: { tension: 210, friction: 20, mass: 1 },
-      slow: { tension: 280, friction: 60, mass: 1 },
-      bouncy: { tension: 300, friction: 10, mass: 1 }
-    },
-    
-    // Micro-interaction presets
+    // Presets de interacción
     interactions: {
       tap: {
-        scale: 0.96,
-        duration: 100,
-        easing: 'easeOut'
+        scale: 0.98,
+        duration: 120,
+        easing: 'easeOut',
       },
       press: {
-        scale: 0.94,
-        duration: 60,
-        easing: 'easeInOut'
+        scale: 0.96,
+        duration: 100,
+        easing: 'easeInOut',
       },
       hover: {
         scale: 1.02,
-        duration: 200,
-        easing: 'easeOut'
-      }
-    }
-  }
+        duration: 180,
+        easing: 'smooth',
+      },
+      subtle: {
+        scale: 0.99,
+        duration: 150,
+        easing: 'gentle',
+      },
+    },
+  },
 };
 
-// Extended Color Palette with Accessibility Focus
+// ============================================================================
+// COLOR PALETTE - Paleta moderna con enfoque en accesibilidad
+// ============================================================================
+
 export const COLOR_PALETTE = {
-  // Primary Brand Colors - More sophisticated palette
+  // Primary - Indigo sofisticado
   primary: {
-    50: '#eff6ff',
-    100: '#dbeafe', 
-    200: '#bfdbfe',
-    300: '#93c5fd',
-    400: '#60a5fa',
-    500: '#3b82f6',
-    600: '#2563eb',
-    700: '#1d4ed8',
-    800: '#1e40af',
-    900: '#1e3a8a',
-    950: '#172554'
+    50: '#EEF2FF',
+    100: '#E0E7FF',
+    200: '#C7D2FE',
+    300: '#A5B4FC',
+    400: '#818CF8',
+    500: '#6366F1',  // Base
+    600: '#4F46E5',  // Hover
+    700: '#4338CA',  // Pressed
+    800: '#3730A3',
+    900: '#312E81',
+    950: '#1E1B4B',
   },
 
-  // Enhanced Semantic Colors
+  // Accent - Ámbar cálido
+  accent: {
+    50: '#FFFBEB',
+    100: '#FEF3C7',
+    200: '#FDE68A',
+    300: '#FCD34D',
+    400: '#FBBF24',  // Base
+    500: '#F59E0B',  // Hover
+    600: '#D97706',  // Pressed
+    700: '#B45309',
+    800: '#92400E',
+    900: '#78350F',
+  },
+
+  // Success - Verde esmeralda
   success: {
-    50: '#ecfdf5',
-    100: '#d1fae5',
-    200: '#a7f3d0',
-    300: '#6ee7b7',
-    400: '#34d399',
-    500: '#10b981',
+    50: '#ECFDF5',
+    100: '#D1FAE5',
+    200: '#A7F3D0',
+    300: '#6EE7B7',
+    400: '#34D399',
+    500: '#10B981',  // Base
     600: '#059669',
     700: '#047857',
-    800: '#065f46',
-    900: '#064e3b',
-    950: '#022c22'
+    800: '#065F46',
+    900: '#064E3B',
   },
   
+  // Warning - Naranja
   warning: {
-    50: '#fffbeb',
-    100: '#fef3c7',
-    200: '#fde68a', 
-    300: '#fcd34d',
-    400: '#fbbf24',
-    500: '#f59e0b',
-    600: '#d97706',
-    700: '#b45309',
-    800: '#92400e',
-    900: '#78350f',
-    950: '#451a03'
+    50: '#FFF7ED',
+    100: '#FFEDD5',
+    200: '#FED7AA',
+    300: '#FDBA74',
+    400: '#FB923C',
+    500: '#F97316',  // Base
+    600: '#EA580C',
+    700: '#C2410C',
+    800: '#9A3412',
+    900: '#7C2D12',
   },
   
+  // Danger - Rojo
   danger: {
-    50: '#fef2f2',
-    100: '#fee2e2',
-    200: '#fecaca',
-    300: '#fca5a5',
-    400: '#f87171',
-    500: '#ef4444',
-    600: '#dc2626',
-    700: '#b91c1c',
-    800: '#991b1b',
-    900: '#7f1d1d',
-    950: '#450a0a'
+    50: '#FEF2F2',
+    100: '#FEE2E2',
+    200: '#FECACA',
+    300: '#FCA5A5',
+    400: '#F87171',
+    500: '#EF4444',  // Base
+    600: '#DC2626',
+    700: '#B91C1C',
+    800: '#991B1B',
+    900: '#7F1D1D',
   },
 
+  // Info - Azul cielo
   info: {
-    50: '#f0f9ff',
-    100: '#e0f2fe',
-    200: '#bae6fd',
-    300: '#7dd3fc',
-    400: '#38bdf8',
-    500: '#0ea5e9',
-    600: '#0284c7',
-    700: '#0369a1',
+    50: '#F0F9FF',
+    100: '#E0F2FE',
+    200: '#BAE6FD',
+    300: '#7DD3FC',
+    400: '#38BDF8',
+    500: '#0EA5E9',  // Base
+    600: '#0284C7',
+    700: '#0369A1',
     800: '#075985',
-    900: '#0c4a6e',
-    950: '#082f49'
+    900: '#0C4A6E',
   },
 
-  // Sophisticated Neutrals
+  // Neutrals - Grises modernos con matices fríos
   neutral: {
-    0: '#ffffff',
-    25: '#fdfdfd',
-    50: '#fafafa',
-    100: '#f5f5f5',
-    200: '#e5e5e5',
-    300: '#d4d4d4',
-    400: '#a3a3a3',
+    0: '#FFFFFF',
+    25: '#FDFDFD',
+    50: '#FAFAFA',
+    100: '#F5F5F5',
+    200: '#E5E5E5',
+    300: '#D4D4D4',
+    400: '#A3A3A3',
     500: '#737373',
     600: '#525252',
     700: '#404040',
     800: '#262626',
     900: '#171717',
-    950: '#0a0a0a'
+    950: '#0A0A0A',
   },
 
-  // Warm and Cool Variants
-  warmGray: {
-    50: '#fafaf9',
-    100: '#f5f5f4',
-    500: '#78716c',
-    900: '#1c1917'
+  // Slate - Para dark mode
+  slate: {
+    50: '#F8FAFC',
+    100: '#F1F5F9',
+    200: '#E2E8F0',
+    300: '#CBD5E1',
+    400: '#94A3B8',
+    500: '#64748B',
+    600: '#475569',
+    700: '#334155',
+    800: '#1E293B',
+    900: '#0F172A',
+    950: '#020617',
   },
-
-  coolGray: {
-    50: '#f8fafc',
-    100: '#f1f5f9', 
-    500: '#64748b',
-    900: '#0f172a'
-  }
 };
 
-// Enhanced Theme System with Better Contrast
+// ============================================================================
+// THEMES - Light y Dark mode modernos
+// ============================================================================
+
 export const THEMES = {
   light: {
     name: 'Light Mode',
     colors: {
-      // Backgrounds - Layered approach
+      // Backgrounds - Capas sutiles
       background: COLOR_PALETTE.neutral[0],
-      backgroundSecondary: COLOR_PALETTE.neutral[25],
-      backgroundTertiary: COLOR_PALETTE.neutral[50],
-      backgroundQuaternary: COLOR_PALETTE.neutral[100],
+      backgroundSecondary: COLOR_PALETTE.neutral[50],
+      backgroundTertiary: COLOR_PALETTE.neutral[100],
       
-      // Surfaces with proper elevation
+      // Surfaces - Elementos elevados
       surface: COLOR_PALETTE.neutral[0],
       surfaceElevated: COLOR_PALETTE.neutral[25],
       surfaceHighlight: COLOR_PALETTE.neutral[50],
       surfacePressed: COLOR_PALETTE.neutral[100],
       
-      // Interactive surfaces
-      interactive: COLOR_PALETTE.primary[500],
-      interactiveHover: COLOR_PALETTE.primary[600],
-      interactivePressed: COLOR_PALETTE.primary[700],
-      interactiveDisabled: COLOR_PALETTE.neutral[200],
+      // Interactive - Estados de interacción
+      interactive: COLOR_PALETTE.primary[600],
+      interactiveHover: COLOR_PALETTE.primary[700],
+      interactivePressed: COLOR_PALETTE.primary[800],
+      interactiveDisabled: COLOR_PALETTE.neutral[300],
+      interactiveSubtle: COLOR_PALETTE.primary[50],
       
-      // Borders - Multiple weights
+      // Borders - Diferentes pesos
       border: COLOR_PALETTE.neutral[200],
       borderLight: COLOR_PALETTE.neutral[100],
       borderMedium: COLOR_PALETTE.neutral[300],
       borderStrong: COLOR_PALETTE.neutral[400],
       borderFocus: COLOR_PALETTE.primary[500],
       
-      // Text - Improved hierarchy
+      // Text - Jerarquía clara
       text: COLOR_PALETTE.neutral[900],
-      textSecondary: COLOR_PALETTE.neutral[700],
+      textSecondary: COLOR_PALETTE.neutral[600],
       textTertiary: COLOR_PALETTE.neutral[500],
       textQuaternary: COLOR_PALETTE.neutral[400],
       textInverse: COLOR_PALETTE.neutral[0],
       textPlaceholder: COLOR_PALETTE.neutral[400],
+      textDisabled: COLOR_PALETTE.neutral[300],
       
-      // Brand colors
-      primary: COLOR_PALETTE.primary[500],
+      // Brand
+      primary: COLOR_PALETTE.primary[600],
       primarySubtle: COLOR_PALETTE.primary[50],
       primaryMuted: COLOR_PALETTE.primary[100],
       
-      // Semantic colors
+      accent: COLOR_PALETTE.accent[500],
+      accentSubtle: COLOR_PALETTE.accent[50],
+      accentMuted: COLOR_PALETTE.accent[100],
+      
+      // Semantic
       success: COLOR_PALETTE.success[500],
       successSubtle: COLOR_PALETTE.success[50],
       successMuted: COLOR_PALETTE.success[100],
@@ -385,57 +395,62 @@ export const THEMES = {
       infoSubtle: COLOR_PALETTE.info[50],
       infoMuted: COLOR_PALETTE.info[100],
       
-      // Overlay system
-      overlay: 'rgba(0, 0, 0, 0.5)',
-      overlayLight: 'rgba(0, 0, 0, 0.25)',
-      overlayStrong: 'rgba(0, 0, 0, 0.75)',
-      scrim: 'rgba(0, 0, 0, 0.6)',
-      backdrop: 'rgba(0, 0, 0, 0.4)'
-    }
+      // Overlays
+      overlay: 'rgba(0, 0, 0, 0.40)',
+      overlayLight: 'rgba(0, 0, 0, 0.20)',
+      overlayStrong: 'rgba(0, 0, 0, 0.60)',
+      scrim: 'rgba(0, 0, 0, 0.50)',
+      backdrop: 'rgba(15, 23, 42, 0.40)',
+    },
   },
   
   dark: {
     name: 'Dark Mode',
     colors: {
-      // Dark backgrounds
-      background: COLOR_PALETTE.neutral[950],
-      backgroundSecondary: COLOR_PALETTE.neutral[900],
-      backgroundTertiary: COLOR_PALETTE.neutral[800],
-      backgroundQuaternary: COLOR_PALETTE.neutral[700],
+      // Backgrounds - Tonos slate profundos
+      background: COLOR_PALETTE.slate[950],
+      backgroundSecondary: COLOR_PALETTE.slate[900],
+      backgroundTertiary: COLOR_PALETTE.slate[800],
       
-      // Dark surfaces
-      surface: COLOR_PALETTE.neutral[900],
-      surfaceElevated: COLOR_PALETTE.neutral[800],
-      surfaceHighlight: COLOR_PALETTE.neutral[700],
-      surfacePressed: COLOR_PALETTE.neutral[600],
+      // Surfaces - Elevación con overlay de blanco
+      surface: COLOR_PALETTE.slate[900],
+      surfaceElevated: '#1A2332',  // slate-900 + 5% white overlay
+      surfaceHighlight: '#242F40',  // slate-800 + 8% white overlay
+      surfacePressed: COLOR_PALETTE.slate[700],
       
-      // Interactive surfaces in dark
+      // Interactive
       interactive: COLOR_PALETTE.primary[400],
       interactiveHover: COLOR_PALETTE.primary[300],
       interactivePressed: COLOR_PALETTE.primary[200],
-      interactiveDisabled: COLOR_PALETTE.neutral[700],
+      interactiveDisabled: COLOR_PALETTE.slate[700],
+      interactiveSubtle: COLOR_PALETTE.primary[950],
       
-      // Dark borders
-      border: COLOR_PALETTE.neutral[700],
-      borderLight: COLOR_PALETTE.neutral[800],
-      borderMedium: COLOR_PALETTE.neutral[600],
-      borderStrong: COLOR_PALETTE.neutral[500],
+      // Borders - Más sutiles en dark
+      border: 'rgba(255, 255, 255, 0.08)',
+      borderLight: 'rgba(255, 255, 255, 0.04)',
+      borderMedium: 'rgba(255, 255, 255, 0.12)',
+      borderStrong: 'rgba(255, 255, 255, 0.16)',
       borderFocus: COLOR_PALETTE.primary[400],
       
-      // Dark text
-      text: COLOR_PALETTE.neutral[0],
-      textSecondary: COLOR_PALETTE.neutral[200],
-      textTertiary: COLOR_PALETTE.neutral[400],
-      textQuaternary: COLOR_PALETTE.neutral[500],
-      textInverse: COLOR_PALETTE.neutral[900],
-      textPlaceholder: COLOR_PALETTE.neutral[500],
+      // Text - Alto contraste pero no puro
+      text: COLOR_PALETTE.neutral[50],
+      textSecondary: 'rgba(255, 255, 255, 0.70)',
+      textTertiary: 'rgba(255, 255, 255, 0.50)',
+      textQuaternary: 'rgba(255, 255, 255, 0.35)',
+      textInverse: COLOR_PALETTE.slate[900],
+      textPlaceholder: 'rgba(255, 255, 255, 0.40)',
+      textDisabled: 'rgba(255, 255, 255, 0.25)',
       
-      // Dark brand
+      // Brand
       primary: COLOR_PALETTE.primary[400],
       primarySubtle: COLOR_PALETTE.primary[950],
       primaryMuted: COLOR_PALETTE.primary[900],
       
-      // Dark semantic
+      accent: COLOR_PALETTE.accent[400],
+      accentSubtle: COLOR_PALETTE.accent[950],
+      accentMuted: COLOR_PALETTE.accent[900],
+      
+      // Semantic
       success: COLOR_PALETTE.success[400],
       successSubtle: COLOR_PALETTE.success[950],
       successMuted: COLOR_PALETTE.success[900],
@@ -452,19 +467,22 @@ export const THEMES = {
       infoSubtle: COLOR_PALETTE.info[950],
       infoMuted: COLOR_PALETTE.info[900],
       
-      // Dark overlays
-      overlay: 'rgba(0, 0, 0, 0.8)',
-      overlayLight: 'rgba(0, 0, 0, 0.5)',
-      overlayStrong: 'rgba(0, 0, 0, 0.9)',
-      scrim: 'rgba(0, 0, 0, 0.8)',
-      backdrop: 'rgba(0, 0, 0, 0.6)'
-    }
-  }
+      // Overlays
+      overlay: 'rgba(0, 0, 0, 0.70)',
+      overlayLight: 'rgba(0, 0, 0, 0.40)',
+      overlayStrong: 'rgba(0, 0, 0, 0.85)',
+      scrim: 'rgba(0, 0, 0, 0.75)',
+      backdrop: 'rgba(0, 0, 0, 0.60)',
+    },
+  },
 };
 
-// Enhanced Component Configurations
+// ============================================================================
+// COMPONENTS - Configuraciones de componentes modernizadas
+// ============================================================================
+
 export const COMPONENTS = {
-  // Advanced Button System
+  // Sistema de Botones moderno
   button: {
     base: {
       minHeight: 44,
@@ -473,144 +491,191 @@ export const COMPONENTS = {
       paddingVertical: DESIGN_TOKENS.spacing.md,
       alignItems: 'center',
       justifyContent: 'center',
-      flexDirection: 'row'
+      flexDirection: 'row',
     },
     
     sizes: {
       xs: { 
-        minHeight: 28, 
-        paddingHorizontal: DESIGN_TOKENS.spacing.sm,
+        minHeight: 32, 
+        paddingHorizontal: DESIGN_TOKENS.spacing.md,
         paddingVertical: DESIGN_TOKENS.spacing.xs,
-        fontSize: DESIGN_TOKENS.typography.sizes.sm
+        fontSize: DESIGN_TOKENS.typography.sizes.xs,
       },
       sm: { 
         minHeight: 36,
         paddingHorizontal: DESIGN_TOKENS.spacing.md,
         paddingVertical: DESIGN_TOKENS.spacing.sm,
-        fontSize: DESIGN_TOKENS.typography.sizes.sm
+        fontSize: DESIGN_TOKENS.typography.sizes.sm,
       },
       md: { 
         minHeight: 44,
         paddingHorizontal: DESIGN_TOKENS.spacing.lg,
         paddingVertical: DESIGN_TOKENS.spacing.md,
-        fontSize: DESIGN_TOKENS.typography.sizes.base
+        fontSize: DESIGN_TOKENS.typography.sizes.base,
       },
       lg: { 
         minHeight: 52,
         paddingHorizontal: DESIGN_TOKENS.spacing.xl,
         paddingVertical: DESIGN_TOKENS.spacing.lg,
-        fontSize: DESIGN_TOKENS.typography.sizes.md
-      }
+        fontSize: DESIGN_TOKENS.typography.sizes.md,
+      },
     },
     
     variants: {
       primary: {
-        ...DESIGN_TOKENS.elevation.sm
+        ...DESIGN_TOKENS.elevation.sm,
       },
       secondary: {
-        borderWidth: 1,
-        backgroundColor: 'transparent'
+        borderWidth: 1.5,
+        backgroundColor: 'transparent',
       },
       tertiary: {
-        backgroundColor: 'transparent'
+        backgroundColor: 'transparent',
       },
       ghost: {
         backgroundColor: 'transparent',
-        borderWidth: 0
+        borderWidth: 0,
       },
-      destructive: {
-        ...DESIGN_TOKENS.elevation.sm
-      }
     },
     
     states: {
       default: { transform: [{ scale: 1 }], opacity: 1 },
-      pressed: { transform: [{ scale: 0.96 }], opacity: 0.9 },
-      disabled: { opacity: 0.4, transform: [{ scale: 1 }] },
-      loading: { opacity: 0.7, transform: [{ scale: 1 }] }
-    }
+      pressed: { transform: [{ scale: 0.98 }], opacity: 0.92 },
+      disabled: { opacity: 0.40, transform: [{ scale: 1 }] },
+      loading: { opacity: 0.70, transform: [{ scale: 1 }] },
+    },
   },
 
-  // Enhanced FAB System
+  // FAB modernizado
   fab: {
     base: {
       ...DESIGN_TOKENS.elevation.fab,
       position: 'absolute',
       justifyContent: 'center',
       alignItems: 'center',
-      borderRadius: DESIGN_TOKENS.borderRadius.fab
+      borderRadius: DESIGN_TOKENS.borderRadius.fab,
     },
     
     sizes: {
-      small: { width: 40, height: 40 },
+      small: { width: 48, height: 48 },
       regular: { width: 56, height: 56 },
-      large: { width: 72, height: 72 },
+      large: { width: 64, height: 64 },
       extended: {
-        height: 48,
-        minWidth: 80,
+        height: 56,
+        minWidth: 96,
         paddingHorizontal: DESIGN_TOKENS.spacing.lg,
-        borderRadius: DESIGN_TOKENS.borderRadius['2xl']
-      }
+        borderRadius: DESIGN_TOKENS.borderRadius.xl,
+      },
     },
 
     positions: {
       'bottom-right': { 
         bottom: DESIGN_TOKENS.spacing.xl, 
-        right: DESIGN_TOKENS.spacing.xl 
+        right: DESIGN_TOKENS.spacing.xl,
       },
       'bottom-left': { 
         bottom: DESIGN_TOKENS.spacing.xl, 
-        left: DESIGN_TOKENS.spacing.xl 
+        left: DESIGN_TOKENS.spacing.xl,
       },
       'bottom-center': { 
         bottom: DESIGN_TOKENS.spacing.xl,
-        left: '50%',
-        marginLeft: -28
-      }
+        alignSelf: 'center',
+      },
     },
 
     states: {
       default: { transform: [{ scale: 1 }], opacity: 1 },
-      pressed: { transform: [{ scale: 0.9 }], opacity: 0.9 },
+      pressed: { transform: [{ scale: 0.92 }], opacity: 0.90 },
       expanded: { transform: [{ rotate: '45deg' }] },
-      collapsed: { transform: [{ rotate: '0deg' }] }
-    }
+    },
   },
 
-  // Card Component Enhancement  
+  // Cards modernizadas
   card: {
     base: {
       borderRadius: DESIGN_TOKENS.borderRadius.card,
       padding: DESIGN_TOKENS.spacing.lg,
-      ...DESIGN_TOKENS.elevation.sm
+      marginBottom: DESIGN_TOKENS.spacing.md,
+      ...DESIGN_TOKENS.elevation.xs,
     },
     
     variants: {
-      elevated: { ...DESIGN_TOKENS.elevation.md },
-      outlined: { borderWidth: 1, ...DESIGN_TOKENS.elevation.none },
-      filled: { ...DESIGN_TOKENS.elevation.none },
+      elevated: { ...DESIGN_TOKENS.elevation.sm },
+      outlined: { 
+        borderWidth: 1.5,
+        ...DESIGN_TOKENS.elevation.none,
+      },
+      filled: { 
+        ...DESIGN_TOKENS.elevation.none,
+      },
       interactive: { 
-        ...DESIGN_TOKENS.elevation.sm,
-        transform: [{ scale: 1 }]
-      }
+        ...DESIGN_TOKENS.elevation.xs,
+        transform: [{ scale: 1 }],
+      },
     },
     
     states: {
-      pressed: { 
+      default: { 
+        transform: [{ scale: 1 }],
         ...DESIGN_TOKENS.elevation.xs,
-        transform: [{ scale: 0.98 }]
-      }
-    }
+      },
+      pressed: { 
+        transform: [{ scale: 0.99 }],
+        ...DESIGN_TOKENS.elevation.none,
+      },
+      hover: {
+        transform: [{ scale: 1.01 }],
+        ...DESIGN_TOKENS.elevation.sm,
+      },
+    },
   },
 
-  // Enhanced Notification System
+  // Package Cards específicas
+  packageCard: {
+    base: {
+      borderRadius: DESIGN_TOKENS.borderRadius.card,
+      padding: DESIGN_TOKENS.spacing.lg,
+      marginBottom: DESIGN_TOKENS.spacing.md,
+      borderLeftWidth: 4,
+      ...DESIGN_TOKENS.elevation.xs,
+    },
+    
+    statusIndicator: {
+      width: 48,
+      height: 48,
+      borderRadius: DESIGN_TOKENS.borderRadius.md,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: DESIGN_TOKENS.spacing.md,
+    },
+    
+    states: {
+      default: {
+        transform: [{ scale: 1 }],
+        ...DESIGN_TOKENS.elevation.xs,
+      },
+      active: {
+        borderLeftWidth: 6,
+        transform: [{ translateX: -2 }],
+        ...DESIGN_TOKENS.elevation.sm,
+      },
+      pressed: {
+        transform: [{ scale: 0.98 }],
+        ...DESIGN_TOKENS.elevation.none,
+      },
+    },
+  },
+
+  // Notifications modernizadas
   notification: {
     base: {
-      borderRadius: DESIGN_TOKENS.borderRadius.xl,
+      borderRadius: DESIGN_TOKENS.borderRadius.lg,
       padding: DESIGN_TOKENS.spacing.lg,
-      margin: DESIGN_TOKENS.spacing.md,
+      marginHorizontal: DESIGN_TOKENS.spacing.md,
+      marginVertical: DESIGN_TOKENS.spacing.sm,
       minHeight: 64,
-      ...DESIGN_TOKENS.elevation.lg
+      borderLeftWidth: 4,
+      ...DESIGN_TOKENS.elevation.md,
     },
     
     positions: {
@@ -618,99 +683,122 @@ export const COMPONENTS = {
         position: 'absolute', 
         top: DESIGN_TOKENS.spacing.xl,
         left: DESIGN_TOKENS.spacing.md,
-        right: DESIGN_TOKENS.spacing.md
+        right: DESIGN_TOKENS.spacing.md,
       },
       bottom: { 
         position: 'absolute', 
         bottom: DESIGN_TOKENS.spacing.xl,
         left: DESIGN_TOKENS.spacing.md,
-        right: DESIGN_TOKENS.spacing.md
-      }
+        right: DESIGN_TOKENS.spacing.md,
+      },
     },
-    
-    variants: {
-      info: { borderLeftWidth: 4 },
-      success: { borderLeftWidth: 4 },
-      warning: { borderLeftWidth: 4 },
-      error: { borderLeftWidth: 4 }
-    }
   },
 
-  // Location Marker Enhancements
+  // Location Markers mejorados
   locationMarker: {
     base: {
       borderRadius: DESIGN_TOKENS.borderRadius.full,
       borderWidth: 3,
       justifyContent: 'center',
       alignItems: 'center',
-      ...DESIGN_TOKENS.elevation.lg
+      ...DESIGN_TOKENS.elevation.lg,
     },
     
     accuracy: {
       excellent: { 
         size: 48,
-        fontSize: 22,
-        pulseScale: 1.1,
-        glowRadius: 20
+        fontSize: 24,
+        pulseScale: 1.12,
+        glowRadius: 24,
+        borderWidth: 3,
       },
       high: { 
-        size: 42,
-        fontSize: 20,
-        pulseScale: 1.08,
-        glowRadius: 16
+        size: 44,
+        fontSize: 22,
+        pulseScale: 1.10,
+        glowRadius: 20,
+        borderWidth: 3,
       },
       good: { 
+        size: 40,
+        fontSize: 20,
+        pulseScale: 1.08,
+        glowRadius: 16,
+        borderWidth: 2.5,
+      },
+      fair: { 
         size: 36,
         fontSize: 18,
         pulseScale: 1.06,
-        glowRadius: 12
+        glowRadius: 12,
+        borderWidth: 2.5,
       },
-      fair: { 
+      poor: { 
         size: 32,
         fontSize: 16,
         pulseScale: 1.04,
-        glowRadius: 8
+        glowRadius: 8,
+        borderWidth: 2,
       },
-      poor: { 
-        size: 28,
-        fontSize: 14,
-        pulseScale: 1.02,
-        glowRadius: 4
-      }
-    }
+    },
   },
 
-  // Input Enhancement
+  // Inputs modernizados
   input: {
     base: {
       borderRadius: DESIGN_TOKENS.borderRadius.input,
-      borderWidth: 1,
+      borderWidth: 1.5,
       paddingHorizontal: DESIGN_TOKENS.spacing.md,
       paddingVertical: DESIGN_TOKENS.spacing.md,
-      minHeight: 44,
-      fontSize: DESIGN_TOKENS.typography.sizes.base
+      minHeight: 48,
+      fontSize: DESIGN_TOKENS.typography.sizes.base,
     },
     
     states: {
-      focused: { borderWidth: 2 },
-      error: { borderWidth: 2 },
-      disabled: { opacity: 0.6 }
-    }
-  }
+      default: {
+        borderWidth: 1.5,
+      },
+      focused: { 
+        borderWidth: 2,
+        ...DESIGN_TOKENS.elevation.xs,
+      },
+      error: { 
+        borderWidth: 2,
+      },
+      disabled: { 
+        opacity: 0.50,
+      },
+    },
+  },
+
+  // Skeleton loader
+  skeleton: {
+    base: {
+      borderRadius: DESIGN_TOKENS.borderRadius.md,
+      overflow: 'hidden',
+    },
+    animation: {
+      duration: 1500,
+      shimmerColors: ['#E5E5E5', '#F5F5F5', '#E5E5E5'],
+    },
+  },
 };
 
-// Enhanced Layout System
+// ============================================================================
+// LAYOUT - Sistema de layout y spacing
+// ============================================================================
+
 export const LAYOUT = {
   container: {
     maxWidth: 1200,
     paddingHorizontal: DESIGN_TOKENS.spacing.lg,
-    marginHorizontal: 'auto'
+    marginHorizontal: 'auto',
   },
   
   grid: {
     columns: 12,
     gutter: DESIGN_TOKENS.spacing.lg,
-    margin: DESIGN_TOKENS.spacing.xl
+    margin: DESIGN_TOKENS.spacing.lg,
   },
 
   breakpoints: {
@@ -719,7 +807,7 @@ export const LAYOUT = {
     md: 768,
     lg: 992,
     xl: 1200,
-    xxl: 1400
+    xxl: 1400,
   },
 
   zIndex: {
@@ -728,106 +816,155 @@ export const LAYOUT = {
     docked: 10,
     dropdown: 100,
     sticky: 200,
-    banner: 300,
     overlay: 400,
     modal: 500,
     popover: 600,
-    skipLink: 700,
-    toast: 800,
+    toast: 700,
+    notification: 800,
     tooltip: 900,
-    notification: 950,
-    max: 999
+    max: 999,
   },
 
-  // Safe areas and spacing
   safeArea: {
-    top: 44,    // iOS status bar
-    bottom: 34  // iOS home indicator
-  }
+    top: 44,
+    bottom: 34,
+  },
 };
 
-// Enhanced Accessibility
+// ============================================================================
+// ACCESSIBILITY
+// ============================================================================
+
 export const ACCESSIBILITY = {
-  // Touch targets
   minTouchTarget: 44,
   recommendedTouchTarget: 48,
   
-  // Focus management
   focusRing: {
     width: 2,
     offset: 2,
-    style: 'solid'
+    style: 'solid',
   },
   
-  // Contrast requirements
   contrast: {
-    minimum: 3.0,   // WCAG AA Large Text
-    enhanced: 4.5,  // WCAG AA Normal Text
-    maximum: 7.0    // WCAG AAA
+    minimum: 3.0,
+    enhanced: 4.5,
+    maximum: 7.0,
   },
   
-  // Motion preferences
   motion: {
     respectReduceMotion: true,
     fallbackDuration: 0,
-    alternativeIndicators: true
   },
-  
-  // Screen reader support
-  screenReader: {
-    announceChanges: true,
-    describeFocus: true,
-    labelInteractiveElements: true
-  }
 };
 
-// Performance Optimizations
+// ============================================================================
+// PERFORMANCE
+// ============================================================================
+
 export const PERFORMANCE = {
   animations: {
     useNativeDriver: true,
     shouldRasterizeIOS: true,
-    removeClippedSubviews: true
   },
   
   rendering: {
     initialNumToRender: 10,
     maxToRenderPerBatch: 5,
-    updateCellsBatchingPeriod: 50,
     windowSize: 10,
-    getItemLayout: true // When possible
   },
-  
-  images: {
-    defaultResizeMode: 'cover',
-    cache: 'memory',
-    progressive: true,
-    blurRadius: 0
-  },
-  
-  // Memory management
-  memory: {
-    maxCacheSize: 50,
-    cleanupInterval: 60000,
-    lowMemoryWarningThreshold: 0.8
-  }
 };
 
-// Haptic Feedback System
+// ============================================================================
+// HAPTICS
+// ============================================================================
+
 export const HAPTICS = {
   patterns: {
     selection: 'impactLight',
-    success: 'notificationSuccess', 
+    success: 'notificationSuccess',
     warning: 'notificationWarning',
     error: 'notificationError',
     buttonPress: 'impactMedium',
-    longPress: 'impactHeavy'
+    longPress: 'impactHeavy',
   },
   
   enabled: true,
-  respectSystemSettings: true
+  respectSystemSettings: true,
 };
 
-// Consolidated Export
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+export const UI_UTILS = {
+  // Obtener valor responsivo basado en tamaño de pantalla
+  getResponsiveValue: (values, screenSize = 'mobile') => {
+    if (typeof values !== 'object') return values;
+    return values[screenSize] || values.mobile || values.base || values;
+  },
+  
+  // Generar estilos de componente
+  createComponentStyle: (component, variant = 'base', state = 'default', theme = 'light') => {
+    const comp = COMPONENTS[component];
+    if (!comp) return {};
+    
+    return {
+      ...comp.base,
+      ...(comp.variants?.[variant] || {}),
+      ...(comp.states?.[state] || {}),
+    };
+  },
+  
+  // Obtener color del tema
+  getThemeColor: (colorPath, theme = 'light') => {
+    const keys = colorPath.split('.');
+    let color = THEMES[theme].colors;
+    
+    for (const key of keys) {
+      color = color?.[key];
+      if (!color) break;
+    }
+    
+    return color || '#000000';
+  },
+  
+  // Obtener color con opacidad
+  getColorWithOpacity: (color, opacity) => {
+    if (color.startsWith('rgba')) return color;
+    if (color.startsWith('#')) {
+      const r = parseInt(color.slice(1, 3), 16);
+      const g = parseInt(color.slice(3, 5), 16);
+      const b = parseInt(color.slice(5, 7), 16);
+      return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+    }
+    return color;
+  },
+  
+  // Calcular contraste entre dos colores
+  getContrastRatio: (color1, color2) => {
+    // Implementación simplificada
+    // En producción, usar una librería como chroma-js
+    return 4.5;
+  },
+  
+  // Verificar si un color es claro u oscuro
+  isColorLight: (color) => {
+    if (!color || !color.startsWith('#')) return false;
+    
+    const r = parseInt(color.slice(1, 3), 16);
+    const g = parseInt(color.slice(3, 5), 16);
+    const b = parseInt(color.slice(5, 7), 16);
+    
+    // Fórmula de luminancia relativa
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance > 0.5;
+  },
+};
+
+// ============================================================================
+// CONSOLIDATED EXPORT
+// ============================================================================
+
 export const UI_CONFIG = {
   designTokens: DESIGN_TOKENS,
   colors: COLOR_PALETTE,
@@ -837,39 +974,11 @@ export const UI_CONFIG = {
   accessibility: ACCESSIBILITY,
   performance: PERFORMANCE,
   haptics: HAPTICS,
+  utils: UI_UTILS,
   
-  // Utility functions
-  utils: {
-    // Get responsive value based on screen size
-    getResponsiveValue: (values, screenSize) => {
-      return values[screenSize] || values.mobile || values;
-    },
-    
-    // Generate component styles
-    createComponentStyle: (component, variant = 'base', state = 'default') => {
-      const comp = COMPONENTS[component];
-      if (!comp) return {};
-      
-      return {
-        ...comp.base,
-        ...(comp.variants?.[variant] || {}),
-        ...(comp.states?.[state] || {})
-      };
-    },
-    
-    // Theme color getter
-    getThemeColor: (colorPath, theme = 'light') => {
-      const keys = colorPath.split('.');
-      let color = THEMES[theme].colors;
-      
-      for (const key of keys) {
-        color = color[key];
-        if (!color) break;
-      }
-      
-      return color;
-    }
-  }
+  // Constantes de conveniencia
+  VERSION: '2.0.0',
+  UPDATED: '2025-01-01',
 };
 
-export default UI_CONFIG;
+export default UI_CONFIG

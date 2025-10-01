@@ -215,6 +215,34 @@ const useMapControls = (sendMessageToWebView, isMapReady) => {
     return status;
   }, [getControlsStatus]);
 
+  const updateUserLocation = useCallback((markerData) => {
+    if (!markerData) {
+      console.warn('⚠️ No se puede actualizar marcador: datos no válidos');
+      return false;
+    }
+    
+    if (!sendMessageToWebView) {
+      console.warn('⚠️ No se puede actualizar marcador - sendMessageToWebView no disponible');
+      return false;
+    }
+    
+    const message = {
+      type: 'updateUserLocation', // Usamos el nuevo tipo de mensaje
+      marker: markerData
+    };
+    
+    console.log('📍 Enviando actualización de marcador de usuario');
+    const result = sendMessageToWebView(message);
+    
+    if (!result) {
+      console.log('⏳ Marcador agregado a cola de actualización');
+    } else {
+      console.log('✅ Comando de actualización enviado');
+    }
+    
+    return result;
+  }, [sendMessageToWebView]);
+  
   return {
     updateDriverLocation,
     centerOnLocation,
@@ -222,7 +250,7 @@ const useMapControls = (sendMessageToWebView, isMapReady) => {
     loadPackagesOnMap,
     addUserLocationMarker,
     clearUserMarkers,
-    
+    updateUserLocation,
     // Funciones de utilidad y diagnóstico
     isMapReady,
     canSendMessages: isMapReady && !!sendMessageToWebView,
