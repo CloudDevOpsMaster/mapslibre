@@ -1,13 +1,12 @@
-// mapscreen/index.js - Fixed version with proper exports and imports
+// mapscreen/components/EnhancedMapScreen.js - Cleaned version
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { View, StyleSheet, StatusBar, Text, Animated } from 'react-native';
 import { WebView } from 'react-native-webview';
 
-// Import components - Using relative paths
+// Import components
 import LoadingScreen from '../components/LoadingScreen';
-import EnhancedNotificationSystem from './EnhancedNotificationSystem';
 
-// Check if ImprovedFloatingButtons exists, fallback to basic component
+// Import ImprovedFloatingButtons with fallback
 let ImprovedFloatingButtons;
 try {
   ImprovedFloatingButtons = require('../components/ImprovedFloatingButtons').default;
@@ -70,27 +69,6 @@ try {
     fadeIn: () => ({ start: () => { } }),
     getAnimatedValue: () => new Animated.Value(1)
   });
-}
-
-// Import services with fallbacks
-let NotificationService, PackageService;
-
-try {
-  NotificationService = require('../services/NotificationService').default;
-} catch (error) {
-  console.warn('NotificationService not found, using fallback');
-  NotificationService = class {
-    showTemporaryNotification() { }
-  };
-}
-
-try {
-  PackageService = require('../services/PackageService').default;
-} catch (error) {
-  console.warn('PackageService not found, using fallback');
-  PackageService = class {
-    constructor() { }
-  };
 }
 
 // Import utilities with fallbacks
@@ -160,26 +138,12 @@ const MapScreen = ({
   initialPackages = [],
   onPackageUpdate,
   onLocationUpdate,
-  onRouteCalculated,
-  onGeofenceEnter,
   onError,
   theme = 'light',
-  enableRealTimeTracking = true,
-  enableGeofencing = true,
-  enableHaptics = true,
   locationConfig = {},
-  customStyles = {},
-  mapStyle = 'default',
   primaryColor,
   accentColor,
-  performanceMode = 'medium',
-  maxPackagesVisible = 50,
-  enableClustering = true,
-  clusterRadius = 50,
-  geofenceConfig = {},
   testID = 'map-screen',
-  animationConfig = {},
-  uiConfigOverride = {}
 }) => {
   // Refs
   const webViewRef = useRef(null);
@@ -190,7 +154,6 @@ const MapScreen = ({
   const [notification, setNotification] = useState({ message: null, type: 'info' });
   const [showSettings, setShowSettings] = useState(false);
   const [initializationError, setInitializationError] = useState(null);
-  const [userLocationMarkers, setUserLocationMarkers] = useState([]);
 
   // Message queue
   const [messageQueue, setMessageQueue] = useState([]);
@@ -205,27 +168,15 @@ const MapScreen = ({
     customAdapter || AdapterFactory.createAdapter(dataSource, apiConfig || {})
   );
 
-  const packageService = useRef(new PackageService(adapter.current));
-  const notificationService = useRef(new NotificationService(enableHaptics));
-
   // Hooks
   const {
     currentLocation,
-    isTracking,
-    permissionStatus,
     getCurrentLocation,
-    startLocationTracking,
-    stopLocationTracking
   } = useLocationTracking(locationConfig || {});
 
   const {
     packages,
     isLoading: packagesLoading,
-    error: packagesError,
-    updatePackageStatus,
-    loadPackages,
-    getPackageDetails,
-    subscribeToUpdates
   } = usePackageManager(adapter.current, initialPackages || []);
 
   // Theme handling
@@ -272,7 +223,7 @@ const MapScreen = ({
       messageQueueRef.current = [...messageQueueRef.current, enrichedMessage];
       return false;
     }
-  }, [isWebViewReady, isMapReady, isWebViewLoaded]);
+  }, [isWebViewReady]);
 
   // Process message queue
   const processMessageQueue = useCallback(() => {
@@ -341,22 +292,16 @@ const MapScreen = ({
       onLocationUpdate(locationData);
     }
   }, [onLocationUpdate]);
-  // EnhancedMapScreen.js (Alrededor de la línea 345)
-
-  // EnhancedMapScreen.js (Alrededor de la línea 345)
 
   const handleCenterLocation = useCallback(async (locationData = null) => {
     const targetLocation = locationData || currentLocation;
 
     if (targetLocation) {
-      // Caso 1: Se proporciona la ubicación o ya se conoce (currentLocation)
       centerOnLocation(targetLocation);
     } else {
-      // Caso 2: Es necesario obtener la ubicación primero
       try {
         const location = await getCurrentLocation();
         if (location) {
-          // 🆕 INICIO: Lógica para enviar el pin/marcador al mapa
           const markerId = `user-center-${Date.now()}`;
           const markerData = {
             id: markerId,
@@ -371,23 +316,20 @@ const MapScreen = ({
             isUserLocation: true
           };
 
-          // Envía el mensaje al WebView para que dibuje el marcador
           sendMessageToWebView({
             type: 'addUserLocationMarker',
             marker: markerData
           });
 
-          // Centra el mapa después de solicitar el pin
           centerOnLocation(location);
           console.log('✅ Ubicación actual obtenida, pin enviado y mapa centrado.');
-          // 🆕 FIN: Lógica para enviar el pin
         }
       } catch (error) {
         console.error('❌ Error al obtener la ubicación:', error);
       }
     }
-    // IMPORTANTE: Se añade sendMessageToWebView a las dependencias
   }, [currentLocation, centerOnLocation, getCurrentLocation, sendMessageToWebView]);
+
   const handleFitToPackages = useCallback(() => {
     if (packages && packages.length > 0) {
       fitToPackages();
@@ -545,5 +487,4 @@ const styles = StyleSheet.create({
   },
 });
 
-// IMPORTANT: Export the component as default
 export default MapScreen;

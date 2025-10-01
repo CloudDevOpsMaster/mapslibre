@@ -1,4 +1,4 @@
-import { Alert, Platform, Vibration } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import * as Location from 'expo-location';
 
 export const LOCATION_CONFIG = {
@@ -22,7 +22,6 @@ export const ACCURACY_THRESHOLDS = {
 export class LocationService {
   constructor() {
     this.locationPermission = null;
-    this.locationHistory = [];
   }
 
   async checkLocationPermissions() {
