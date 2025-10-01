@@ -1,38 +1,20 @@
-export const calculateDistance = (lat1, lon1, lat2, lon2) => {
-  const R = 6371e3; // Earth's radius in meters
-  const φ1 = lat1 * Math.PI/180;
-  const φ2 = lat2 * Math.PI/180;
-  const Δφ = (lat2-lat1) * Math.PI/180;
-  const Δλ = (lon2-lon1) * Math.PI/180;
+// ============================================================================
+// FILE: mapscreen/utils/mapHTMLGenerator.js
+// PURPOSE: Generate MapLibre GL HTML for WebView
+// ============================================================================
 
-  const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-          Math.cos(φ1) * Math.cos(φ2) *
-          Math.sin(Δλ/2) * Math.sin(Δλ/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-
-  return R * c; // Distance in meters
-};
-
-export const checkGeofence = (currentCoords, targetCoords, radius = 100) => {
-  const distance = calculateDistance(
-    currentCoords.latitude,
-    currentCoords.longitude,
-    targetCoords.latitude,
-    targetCoords.longitude
-  );
-  
-  return {
-    isInside: distance <= radius,
-    distance: Math.round(distance)
-  };
-};
-
+/**
+ * Generate complete MapLibre GL HTML for WebView
+ * @param {Object} currentLocation - Current location {latitude, longitude}
+ * @param {string} theme - Theme name ('light' or 'dark')
+ * @returns {string} Complete HTML string
+ */
 export const generateMapHTML = (currentLocation, theme = 'light') => {
   const defaultLat = currentLocation?.latitude || 20.6597;
   const defaultLng = currentLocation?.longitude || -103.3496;
-  
-  const themeStyles = theme === 'dark' 
-    ? 'filter: brightness(0.8) contrast(1.2) hue-rotate(180deg) invert(1)' 
+
+  const themeStyles = theme === 'dark'
+    ? 'filter: brightness(0.8) contrast(1.2) hue-rotate(180deg) invert(1)'
     : 'none';
 
   return `
@@ -104,7 +86,7 @@ export const generateMapHTML = (currentLocation, theme = 'light') => {
             100% { transform: rotate(360deg); }
         }
         
-        /* Estilos para marcadores personalizados */
+        /* Custom marker styles */
         .custom-marker {
             background-color: #3b82f6;
             border: 3px solid #ffffff;
@@ -160,7 +142,6 @@ export const generateMapHTML = (currentLocation, theme = 'light') => {
             height: 24px;
         }
         
-        /* Animación de entrada */
         .marker-entrance {
             animation: markerEntrance 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
@@ -176,7 +157,6 @@ export const generateMapHTML = (currentLocation, theme = 'light') => {
             }
         }
         
-        /* Popup personalizado */
         .maplibre-popup-content {
             padding: 16px;
             border-radius: 12px;
@@ -206,7 +186,7 @@ export const generateMapHTML = (currentLocation, theme = 'light') => {
         let userLocationMarkers = new Map();
         let messageCount = 0;
         
-        // Configuración de precisión
+        // Accuracy configuration
         const ACCURACY_LEVELS = {
             excellent: { threshold: 5, label: 'Excelente' },
             high: { threshold: 15, label: 'Muy buena' },
@@ -255,7 +235,6 @@ export const generateMapHTML = (currentLocation, theme = 'light') => {
                 map.on('load', function() {
                     console.log('✅ Mapa cargado exitosamente');
                     
-                    // Fade out loading screen
                     const loadingEl = document.getElementById('loading');
                     loadingEl.style.opacity = '0';
                     setTimeout(() => {
@@ -263,7 +242,6 @@ export const generateMapHTML = (currentLocation, theme = 'light') => {
                         document.getElementById('map').style.display = 'block';
                     }, 500);
                     
-                    // Notificar a React Native
                     notifyReactNative({
                         type: 'mapReady',
                         capabilities: {
@@ -272,8 +250,6 @@ export const generateMapHTML = (currentLocation, theme = 'light') => {
                             popups: true
                         }
                     });
-                    
-                    console.log('📡 Listener de mensajes activado');
                 });
 
                 map.on('error', function(e) {
@@ -296,8 +272,6 @@ export const generateMapHTML = (currentLocation, theme = 'light') => {
         function addUserLocationMarker(markerData) {
             try {
                 console.log('📍 PROCESANDO MARCADOR:', markerData.id);
-                console.log('📍 Coordenadas:', markerData.coordinates);
-                console.log('📍 Precisión:', markerData.accuracy);
                 
                 const { id, coordinates, title, description, accuracy, style } = markerData;
                 
@@ -306,13 +280,9 @@ export const generateMapHTML = (currentLocation, theme = 'light') => {
                 }
                 
                 const accuracyLevel = getAccuracyLevel(accuracy || 999);
-                console.log('📍 Nivel de precisión:', accuracyLevel);
-                
-                // Crear elemento del marcador
                 const markerElement = document.createElement('div');
                 markerElement.className = \`custom-marker \${accuracyLevel} marker-entrance\`;
                 
-                // Agregar icono/emoji
                 const icon = {
                     excellent: '🎯',
                     high: '📍',
@@ -324,18 +294,12 @@ export const generateMapHTML = (currentLocation, theme = 'light') => {
                 markerElement.innerHTML = icon;
                 markerElement.setAttribute('data-marker-id', id);
                 
-                console.log('📍 Elemento del marcador creado:', markerElement.className);
-                
-                // Crear marcador de MapLibre
                 const marker = new maplibregl.Marker({
                     element: markerElement,
                     anchor: 'center'
                 })
                 .setLngLat([coordinates.longitude, coordinates.latitude]);
                 
-                console.log('📍 Marcador MapLibre creado en:', [coordinates.longitude, coordinates.latitude]);
-                
-                // Crear popup si hay descripción
                 if (title || description) {
                     const popup = new maplibregl.Popup({ 
                         offset: 25,
@@ -358,11 +322,8 @@ export const generateMapHTML = (currentLocation, theme = 'light') => {
                     marker.setPopup(popup);
                 }
                 
-                // Agregar al mapa
                 marker.addTo(map);
-                console.log('📍 Marcador agregado al mapa');
                 
-                // Guardar referencia
                 userLocationMarkers.set(id, {
                     marker: marker,
                     element: markerElement,
@@ -371,12 +332,8 @@ export const generateMapHTML = (currentLocation, theme = 'light') => {
                     timestamp: markerData.timestamp || new Date().toISOString()
                 });
                 
-                console.log(\`📊 Total marcadores: \${userLocationMarkers.size}\`);
-                
-                // Limpiar marcadores antiguos
                 cleanupOldMarkers();
                 
-                // Notificar éxito
                 notifyReactNative({
                     type: 'userLocationMarkerAdded',
                     markerId: id,
@@ -389,8 +346,6 @@ export const generateMapHTML = (currentLocation, theme = 'light') => {
                 
             } catch (error) {
                 console.error('❌ Error agregando marcador:', error);
-                console.error('📄 Datos del marcador:', markerData);
-                
                 notifyReactNative({
                     type: 'userLocationMarkerError',
                     error: error.message,
@@ -403,11 +358,9 @@ export const generateMapHTML = (currentLocation, theme = 'light') => {
             const maxMarkers = 5;
             
             if (userLocationMarkers.size > maxMarkers) {
-                // Convertir a array y ordenar por timestamp
                 const markersArray = Array.from(userLocationMarkers.entries())
                     .sort((a, b) => new Date(b[1].timestamp) - new Date(a[1].timestamp));
                 
-                // Remover los más antiguos
                 const toRemove = markersArray.slice(maxMarkers);
                 
                 toRemove.forEach(([markerId, markerData]) => {
@@ -419,8 +372,6 @@ export const generateMapHTML = (currentLocation, theme = 'light') => {
                         console.warn('⚠️ Error removiendo marcador antiguo:', error);
                     }
                 });
-                
-                console.log(\`🧹 Limpieza: \${toRemove.length} marcadores antiguos removidos\`);
             }
         }
         
@@ -450,8 +401,6 @@ export const generateMapHTML = (currentLocation, theme = 'light') => {
             try {
                 const { latitude, longitude, zoom = 15, animate = true, duration = 1500 } = data;
                 
-                console.log(\`🎯 Centrando en: \${latitude}, \${longitude} (zoom: \${zoom})\`);
-                
                 const options = {
                     center: [longitude, latitude],
                     zoom: zoom
@@ -467,7 +416,6 @@ export const generateMapHTML = (currentLocation, theme = 'light') => {
                     map.jumpTo(options);
                 }
                 
-                // Notificar completado
                 setTimeout(() => {
                     notifyReactNative({
                         type: 'mapCentered',
@@ -495,48 +443,35 @@ export const generateMapHTML = (currentLocation, theme = 'light') => {
                 
                 try {
                     window.ReactNativeWebView.postMessage(JSON.stringify(message));
-                    console.log('📤 Mensaje enviado a React Native:', data.type);
                 } catch (error) {
                     console.error('❌ Error enviando mensaje a RN:', error);
                 }
-            } else {
-                console.warn('⚠️ ReactNativeWebView no disponible');
             }
         }
         
-        // MEJORADO: Manejador de mensajes más robusto
         function handleIncomingMessage(event) {
             messageCount++;
             const msgId = \`[\${messageCount}]\`;
             
             try {
-                console.log(\`📥 \${msgId} Mensaje recibido:\`, event.data);
-                
                 const data = JSON.parse(event.data);
-                console.log(\`📋 \${msgId} Procesando mensaje tipo:\`, data.type);
                 
                 switch (data.type) {
                     case 'addUserLocationMarker':
-                        console.log(\`📍 \${msgId} Procesando addUserLocationMarker...\`);
                         if (data.marker) {
                             addUserLocationMarker(data.marker);
-                        } else {
-                            console.error(\`❌ \${msgId} No se encontraron datos del marcador\`);
                         }
                         break;
                         
                     case 'centerOnLocation':
-                        console.log(\`🎯 \${msgId} Procesando centerOnLocation...\`);
                         centerOnLocation(data);
                         break;
                         
                     case 'clearUserMarkers':
-                        console.log(\`🗑️ \${msgId} Limpiando marcadores...\`);
                         clearAllUserMarkers();
                         break;
                         
                     case 'testConnection':
-                        console.log(\`🔧 \${msgId} Test de conexión recibido\`);
                         notifyReactNative({
                             type: 'connectionTestResponse',
                             message: 'WebView conectado correctamente',
@@ -545,13 +480,11 @@ export const generateMapHTML = (currentLocation, theme = 'light') => {
                         break;
                         
                     default:
-                        console.log(\`❓ \${msgId} Tipo de mensaje desconocido:\`, data.type);
+                        console.log(\`❓ Tipo de mensaje desconocido:\`, data.type);
                 }
                 
             } catch (error) {
                 console.error(\`❌ \${msgId} Error procesando mensaje:\`, error);
-                console.error(\`📄 \${msgId} Mensaje original:\`, event.data);
-                
                 notifyReactNative({
                     type: 'messageProcessingError',
                     error: error.message,
@@ -560,22 +493,16 @@ export const generateMapHTML = (currentLocation, theme = 'light') => {
             }
         }
         
-        // Registrar event listeners
         window.addEventListener('message', handleIncomingMessage);
-        
-        // Para iOS también
         document.addEventListener('message', handleIncomingMessage);
         
-        // Inicializar cuando DOM esté listo
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', initMap);
         } else {
             initMap();
         }
         
-        // Auto-test de conexión
         setTimeout(() => {
-            console.log('📡 Enviando auto-test de conexión...');
             notifyReactNative({
                 type: 'webviewAutoTest',
                 message: 'WebView inicializado y listo'

@@ -1,4 +1,4 @@
-// mapscreen/components/EnhancedMapScreen.js - Cleaned version
+// mapscreen/components/EnhancedMapScreen.js - Refactored Version
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { View, StyleSheet, StatusBar, Text, Animated } from 'react-native';
 import { WebView } from 'react-native-webview';
@@ -71,53 +71,106 @@ try {
   });
 }
 
-// Import utilities with fallbacks
+// ============================================================================
+// UPDATED IMPORTS - Using new refactored utils structure
+// ============================================================================
+
 let generateMapHTML, themes, AdapterFactory;
+let createUserLocationMarker, sendMarkerToMap;
 
+// Try to import from new refactored structure
 try {
-  generateMapHTML = require('../utils/MapHelpers').generateMapHTML;
+  const mapUtils = require('../utils');
+  generateMapHTML = mapUtils.generateMapHTML;
+  createUserLocationMarker = mapUtils.createUserLocationMarker;
+  sendMarkerToMap = mapUtils.sendMarkerToMap;
 } catch (error) {
-  console.warn('MapHelpers not found, using fallback');
-  generateMapHTML = (currentLocation, theme) => `
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Basic Map</title>
-    </head>
-    <body>
-        <div id="map" style="width: 100vw; height: 100vh; background: #e0e0e0; display: flex; align-items: center; justify-content: center; font-family: Arial, sans-serif;">
-            <div style="text-align: center;">
-                <h2>Map Loading...</h2>
-                <p>Location: ${currentLocation ? `${currentLocation.latitude}, ${currentLocation.longitude}` : 'Unknown'}</p>
-                <p>Theme: ${theme}</p>
-            </div>
-        </div>
-        <script>
-            setTimeout(() => {
-                if (window.ReactNativeWebView) {
-                    window.ReactNativeWebView.postMessage(JSON.stringify({
-                        type: 'mapReady',
-                        timestamp: new Date().toISOString()
-                    }));
-                }
-            }, 1000);
-        </script>
-    </body>
-    </html>
-  `;
+  console.warn('New utils structure not found, trying old structure...');
+  
+  // Fallback to old structure
+  // try {
+  //   const oldMapHelpers = require('../utils/MapHelpers');
+  //   generateMapHTML = oldMapHelpers.generateMapHTML;
+  // } catch (fallbackError) {
+  //   console.warn('MapHelpers not found, using basic fallback');
+  //   generateMapHTML = (currentLocation, theme) => `
+  //     <!DOCTYPE html>
+  //     <html>
+  //     <head>
+  //         <meta charset="utf-8">
+  //         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  //         <title>Basic Map</title>
+  //     </head>
+  //     <body>
+  //         <div id="map" style="width: 100vw; height: 100vh; background: #e0e0e0; display: flex; align-items: center; justify-content: center; font-family: Arial, sans-serif;">
+  //             <div style="text-align: center;">
+  //                 <h2>Map Loading...</h2>
+  //                 <p>Location: ${currentLocation ? `${currentLocation.latitude}, ${currentLocation.longitude}` : 'Unknown'}</p>
+  //                 <p>Theme: ${theme}</p>
+  //             </div>
+  //         </div>
+  //         <script>
+  //             setTimeout(() => {
+  //                 if (window.ReactNativeWebView) {
+  //                     window.ReactNativeWebView.postMessage(JSON.stringify({
+  //                         type: 'mapReady',
+  //                         timestamp: new Date().toISOString()
+  //                     }));
+  //                 }
+  //             }, 1000);
+  //         </script>
+  //     </body>
+  //     </html>
+  //   `;
+  // }
+  
+  // Create fallback marker helpers if not available
+  if (!createUserLocationMarker) {
+    createUserLocationMarker = (location, options = {}) => ({
+      id: options.id || `user-location-${Date.now()}`,
+      coordinates: {
+        latitude: location.latitude,
+        longitude: location.longitude
+      },
+      accuracy: location.accuracy || 999,
+      timestamp: location.timestamp || new Date().toISOString(),
+      title: options.title || 'Mi Ubicación Actual',
+      description: `Precisión: ±${Math.round(location.accuracy || 0)}m`,
+      isUserLocation: true
+    });
+  }
+  
+  if (!sendMarkerToMap) {
+    sendMarkerToMap = (mapRef, markerData) => {
+      if (!mapRef?.current) return false;
+      
+      try {
+        const message = JSON.stringify({
+          type: 'addUserLocationMarker',
+          marker: markerData,
+          timestamp: new Date().toISOString(),
+          messageId: `msg_${Date.now()}`
+        });
+        
+        mapRef.current.postMessage(message);
+        return true;
+      } catch (error) {
+        console.error('Error sending marker:', error);
+        return false;
+      }
+    };
+  }
 }
 
-try {
-  themes = require('../utils/constants').themes;
-} catch (error) {
-  console.warn('themes not found, using fallback');
-  themes = {
-    light: { background: '#ffffff', primary: '#007AFF', text: '#000000' },
-    dark: { background: '#1a1a1a', primary: '#0A84FF', text: '#ffffff' }
-  };
-}
+// try {
+//   themes = require('../utils/constants').themes;
+// } catch (error) {
+//   console.warn('themes not found, using fallback');
+//   themes = {
+//     light: { background: '#ffffff', primary: '#007AFF', text: '#000000' },
+//     dark: { background: '#1a1a1a', primary: '#0A84FF', text: '#ffffff' }
+//   };
+// }
 
 try {
   AdapterFactory = require('../adapters/AdapterFactory').default;
@@ -130,6 +183,10 @@ try {
     })
   };
 }
+
+// ============================================================================
+// Main Component
+// ============================================================================
 
 const MapScreen = ({
   dataSource = 'local',
@@ -261,6 +318,22 @@ const MapScreen = ({
           setIsMapReady(true);
           break;
         }
+        case 'userLocationMarkerAdded': {
+          console.log('✅ User location marker added:', data.markerId);
+          if (onLocationUpdate && data.coordinates) {
+            onLocationUpdate({
+              latitude: data.coordinates.latitude,
+              longitude: data.coordinates.longitude,
+              accuracy: data.accuracy,
+              timestamp: data.timestamp
+            });
+          }
+          break;
+        }
+        case 'mapCentered': {
+          console.log('🎯 Map centered on location');
+          break;
+        }
         case 'error': {
           console.error('❌ Map error:', data.error);
           if (onError) {
@@ -275,7 +348,7 @@ const MapScreen = ({
     } catch (error) {
       console.error('❌ Error processing WebView message:', error);
     }
-  }, [onError]);
+  }, [onError, onLocationUpdate]);
 
   // Map controls
   const {
@@ -285,7 +358,10 @@ const MapScreen = ({
     loadPackagesOnMap
   } = useMapControls(sendMessageToWebView, isWebViewReady());
 
-  // Action handlers
+  // ============================================================================
+  // Action handlers - REFACTORED to use new marker helpers
+  // ============================================================================
+
   const handleLocationFound = useCallback((locationData) => {
     console.log('📍 Location found:', locationData);
     if (onLocationUpdate) {
@@ -302,37 +378,36 @@ const MapScreen = ({
       try {
         const location = await getCurrentLocation();
         if (location) {
-          const markerId = `user-center-${Date.now()}`;
-          const markerData = {
-            id: markerId,
-            coordinates: {
-              latitude: location.latitude,
-              longitude: location.longitude
-            },
-            accuracy: location.accuracy || 0,
-            timestamp: location.timestamp || new Date().toISOString(),
+          // ✨ NEW: Use refactored marker helper
+          const markerData = createUserLocationMarker(location, {
             title: "Mi Ubicación Actual",
-            description: `Precisión: ±${Math.round(location.accuracy || 0)}m`,
-            isUserLocation: true
-          };
-
-          sendMessageToWebView({
-            type: 'addUserLocationMarker',
-            marker: markerData
+            id: `user-center-${Date.now()}`
           });
 
-          centerOnLocation(location);
-          console.log('✅ Ubicación actual obtenida, pin enviado y mapa centrado.');
+          // ✨ NEW: Use refactored send function
+          const success = sendMarkerToMap(webViewRef, markerData);
+
+          if (success) {
+            centerOnLocation(location);
+            console.log('✅ Ubicación actual obtenida, pin enviado y mapa centrado.');
+          } else {
+            console.warn('⚠️ No se pudo enviar el marcador');
+          }
         }
       } catch (error) {
         console.error('❌ Error al obtener la ubicación:', error);
+        if (onError) {
+          onError({ type: 'LOCATION_ERROR', message: error.message });
+        }
       }
     }
-  }, [currentLocation, centerOnLocation, getCurrentLocation, sendMessageToWebView]);
+  }, [currentLocation, centerOnLocation, getCurrentLocation, onError]);
 
   const handleFitToPackages = useCallback(() => {
     if (packages && packages.length > 0) {
       fitToPackages();
+    } else {
+      console.warn('⚠️ No hay paquetes para ajustar la vista');
     }
   }, [packages, fitToPackages]);
 
@@ -340,7 +415,10 @@ const MapScreen = ({
     setShowSettings(prev => !prev);
   }, []);
 
+  // ============================================================================
   // Effects
+  // ============================================================================
+
   useEffect(() => {
     if (fadeIn && typeof fadeIn === 'function') {
       fadeIn('screenFade').start();
@@ -368,6 +446,10 @@ const MapScreen = ({
       loadPackagesOnMap(packages, currentLocation);
     }
   }, [isMapReady, packages, currentLocation, loadPackagesOnMap]);
+
+  // ============================================================================
+  // Render
+  // ============================================================================
 
   // Loading state
   if (packagesLoading) {
@@ -442,6 +524,11 @@ const MapScreen = ({
           <Text style={styles.debugText}>
             Queue: {messageQueue.length} msgs | Packages: {packages.length}
           </Text>
+          {currentLocation && (
+            <Text style={styles.debugText}>
+              Location: {currentLocation.latitude.toFixed(4)}, {currentLocation.longitude.toFixed(4)}
+            </Text>
+          )}
         </View>
       )}
     </Animated.View>
